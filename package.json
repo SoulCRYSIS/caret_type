@@ -1,0 +1,45 @@
+{
+  "name": "caret_type_2",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "emulators": "npx -y firebase-tools@latest emulators:start --only auth,firestore --project demo-caret",
+    "dev:emulated": "VITE_USE_EMULATORS=true vite"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans-thai-looped": "^5.3.0",
+    "@fontsource/noto-serif-thai": "^5.3.0",
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-popover": "^1.3.1",
+    "@radix-ui/react-select": "^2.4.1",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "@radix-ui/react-toggle": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.4.1",
+    "@vanilla-extract/css": "^1.21.3",
+    "firebase": "^13.0.0",
+    "motion": "^14.5.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router": "^8.5.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vanilla-extract/vite-plugin": "^5.2.6",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.88.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}

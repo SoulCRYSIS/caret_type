@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validLang(lang) {
+      return lang in ['en', 'th'];
+    }
+
+    function validTier(tier) {
+      return tier in ['easy', 'medium', 'hard', 'expert'];
+    }
+
+    // Mirrors maxPlausibleScore() in src/game/modes/ink-invaders/scoring.ts.
+    function plausibleRun(d) {
+      return d.score is int && d.score >= 0
+        && d.chars is int && d.chars >= 0 && d.chars <= 20000
+        && d.wave is int && d.wave >= 1 && d.wave <= 500
+        && d.wpm is number && d.wpm >= 0 && d.wpm <= 300
+        && d.accuracy is number && d.accuracy >= 0 && d.accuracy <= 1
+        && d.durationMs is number && d.durationMs >= 0 && d.durationMs <= 21600000
+        && d.score <= d.chars * 80 + 100 * d.wave * (d.wave + 1);
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(
+          ['displayName', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt']);
+      allow delete: if false;
+
+      match /runs/{runId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && request.resource.data.keys().hasOnly([
+            'modeId', 'language', 'tier', 'score', 'wpm', 'accuracy', 'wave', 'kills', 'chars',
+            'maxCombo', 'durationMs', 'wpmByWave', 'startedAt', 'endedAt', 'createdAt'])
+          && request.resource.data.modeId is string
+          && validLang(request.resource.data.language)
+          && validTier(request.resource.data.tier)
+          && request.resource.data.wpmByWave is list
+          && request.resource.data.wpmByWave.size() <= 500
+          && request.resource.data.createdAt == request.time
+          && plausibleRun(request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+
+    match /leaderboards/{boardId}/entries/{uid} {
+      allow read: if signedIn();
+
+      function validEntry() {
+        let d = request.resource.data;
+        return d.keys().hasOnly([
+            'uid', 'name', 'photoURL', 'score', 'wpm', 'accuracy', 'wave', 'chars',
+            'durationMs', 'mode', 'lang', 'tier', 'createdAt'])
+          && d.keys().hasAll(['uid', 'name', 'score', 'wpm', 'accuracy', 'wave', 'chars', 'mode', 'lang', 'tier', 'createdAt'])
+          && d.uid == uid
+          && d.name is string && d.name.size() <= 60
+          && (!('photoURL' in d) || d.photoURL == null || (d.photoURL is string && d.photoURL.size() <= 2048))
+          && d.mode is string && d.mode.matches('[a-z0-9-]{1,32}')
+          && validLang(d.lang)
+          && validTier(d.tier)
+          && boardId.matches(d.mode + '_' + d.lang + '_' + d.tier + '_.*')
+          && d.createdAt == request.time
+          && plausibleRun(d);
+      }
+
+      allow create: if isOwner(uid) && validEntry();
+      allow update: if isOwner(uid) && validEntry() && request.resource.data.score > resource.data.score;
+      allow delete: if false;
+    }
+  }
+}
