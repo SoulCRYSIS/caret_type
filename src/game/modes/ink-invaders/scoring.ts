@@ -1,6 +1,23 @@
-export const COMBO_TIERS = [0, 12, 30, 60] as const
+/** Combo needed for ×1 … ×5; each step roughly doubles the one before. */
+export const COMBO_TIERS = [0, 10, 30, 70, 150] as const
 
-/** ×1 … ×4 based on consecutive correct keystrokes. */
+/** Combo lost on a mistype. A breach still clears it entirely. */
+export const MISS_COMBO_PENALTY = 20
+
+export function comboAfterMiss(combo: number): number {
+  return Math.max(0, combo - MISS_COMBO_PENALTY)
+}
+
+/** Progress (0..1) from the current tier toward the next; 1 at the cap. */
+export function tierProgress(combo: number): number {
+  const m = multiplier(combo)
+  if (m >= COMBO_TIERS.length) return 1
+  const lo = COMBO_TIERS[m - 1]
+  const hi = COMBO_TIERS[m]
+  return (combo - lo) / (hi - lo)
+}
+
+/** ×1 … ×5 based on the running combo. */
 export function multiplier(combo: number): number {
   let m = 1
   for (let i = 1; i < COMBO_TIERS.length; i++) if (combo >= COMBO_TIERS[i]) m = i + 1
@@ -25,7 +42,7 @@ export function accuracy(correct: number, errors: number): number {
   return total === 0 ? 0 : correct / total
 }
 
-/** Upper bound used by security rules: every char at ×4 and doubled, plus all flawless wave bonuses. */
+/** Upper bound used by security rules: every char at ×5 and doubled, plus all flawless wave bonuses. */
 export function maxPlausibleScore(chars: number, wave: number): number {
-  return chars * 10 * 4 * 2 + 100 * wave * (wave + 1)
+  return chars * 10 * 5 * 2 + 100 * wave * (wave + 1)
 }

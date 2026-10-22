@@ -1,9 +1,11 @@
 import { FONT_MONO } from '../../../theme/fonts'
 import { clusters, unitCount, WordMatcher } from '../../words/graphemes'
 import type { GameMode, ModeContext, RunResult } from '../types'
-import { accuracy, killScore, multiplier, waveBonus, wpm } from './scoring'
+import { accuracy, comboAfterMiss, killScore, multiplier, waveBonus, wpm } from './scoring'
 import { enemyPos, marginY } from './geometry'
-import type { Enemy, InkState } from './state'
+import { inkCard } from './card'
+import type { Enemy, InkDetails, InkState } from './state'
+import { InkIntro } from './Intro'
 import { InkInvadersView } from './View'
 import { travelTime, waveConfig } from './waves'
 
@@ -44,6 +46,8 @@ function endWave(s: InkState, ctx: ModeContext) {
   const secs = ctx.elapsed() - s.waveStart
   s.wpmByWave.push(wpm(s.waveChars, secs))
   const flawless = !s.damagedThisWave
+  s.wavesCleared++
+  if (flawless) s.flawlessWaves++
   const bonus = waveBonus(s.wave, flawless)
   s.score += bonus
   s.displayScore += bonus
@@ -102,6 +106,7 @@ function spawn(s: InkState, ctx: ModeContext, heavy: boolean) {
     jitter: 0,
     danger: false,
     landed: false,
+    lockedAt: 0,
     el: null,
     w: 0,
     h: 0,
@@ -115,9 +120,12 @@ function removeEnemy(s: InkState, e: Enemy) {
   s.waveDone++
 }
 
-function breakCombo(s: InkState) {
-  if (s.combo >= 5) s.comboBreak = { id: ++s.fxId, value: s.combo }
-  s.combo = 0
+/** A mistype chips the combo; a breach clears it. */
+function breakCombo(s: InkState, hard: boolean) {
+  const next = hard ? 0 : comboAfterMiss(s.combo)
+  const lost = s.combo - next
+  if (lost >= 5) s.comboBreak = { id: ++s.fxId, value: -lost }
+  s.combo = next
 }
 
 function hudTarget(s: InkState): { x: number; y: number } {
@@ -135,6 +143,7 @@ function kill(s: InkState, e: Enemy, ctx: ModeContext) {
   const p = center(e, ctx, s.time)
   s.score += pts
   s.kills++
+  s.inked.push({ word: e.word, secs: Math.max(0.05, ctx.elapsed() - e.lockedAt), heavy: e.heavy, wave: s.wave })
   removeEnemy(s, e)
 
   juice.hitstop(e.heavy ? 120 : Math.min(90, 38 + units * 4))
@@ -189,7 +198,7 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
 function miss(s: InkState, ctx: ModeContext, e: Enemy | null) {
   const { juice } = ctx
   s.errors++
-  breakCombo(s)
+  breakCombo(s, false)
   s.errorFlash++
   juice.audio.thud()
   juice.trauma(0.1)
@@ -205,11 +214,12 @@ function breach(s: InkState, e: Enemy, ctx: ModeContext) {
   const c = juice.colors()
   const p = center(e, ctx, s.time)
   const y = marginY(ctx)
+  s.spilled.push(e.word)
   removeEnemy(s, e)
   s.lives = Math.max(0, s.lives - (e.heavy ? 2 : 1))
   s.damagedThisWave = true
   s.lifeLost++
-  breakCombo(s)
+  breakCombo(s, true)
   juice.audio.blot()
   juice.trauma(0.6)
   juice.splatter(p.x, y, { color: c.error, count: 26, power: 440, angle: -Math.PI / 2, spread: 1.2 })
@@ -236,7 +246,7 @@ function die(s: InkState, ctx: ModeContext) {
   juice.trauma(0.9)
 }
 
-export const inkInvaders: GameMode<InkState> = {
+export const inkInvaders: GameMode<InkState, InkDetails> = {
   id: 'ink-invaders',
   name: 'ink invaders',
   blurb: 'Words drift toward the margin. Type them before they spill.',
@@ -271,6 +281,10 @@ export const inkInvaders: GameMode<InkState> = {
       errors: 0,
       kills: 0,
       wpmByWave: [],
+      inked: [],
+      spilled: [],
+      flawlessWaves: 0,
+      wavesCleared: 0,
       startedAt: Date.now(),
       endedAt: 0,
       banner: null,
@@ -346,6 +360,7 @@ export const inkInvaders: GameMode<InkState> = {
         return true
       }
       s.target = best
+      best.lockedAt = ctx.elapsed()
     }
     const target = s.target
     if (target.matcher.accept(key.char)) hit(s, target, ctx)
@@ -386,6 +401,8 @@ export const inkInvaders: GameMode<InkState> = {
   },
 
   render: InkInvadersView,
+  Intro: InkIntro,
+  seal: 'INK',
 
   isOver(s) {
     return s.phase === 'over'
@@ -410,4 +427,10 @@ export const inkInvaders: GameMode<InkState> = {
       endedAt: s.endedAt || Date.now(),
     }
   },
+
+  details(s): InkDetails {
+    return { inked: s.inked, spilled: s.spilled, flawlessWaves: s.flawlessWaves, wavesCleared: s.wavesCleared }
+  },
+
+  card: inkCard,
 }

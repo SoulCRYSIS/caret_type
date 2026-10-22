@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import type { ModeContext, ModeViewProps } from '../types'
 import { enemyPos, marginY } from './geometry'
-import { multiplier } from './scoring'
+import { COMBO_TIERS, multiplier, tierProgress } from './scoring'
 import type { Banner, Enemy, InkState } from './state'
 import * as css from './view.css'
 
@@ -68,7 +68,7 @@ function BannerView({ banner }: { banner: Banner }) {
 
 export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
   const mult = multiplier(s.combo)
-  const comboScale = 1 + Math.min(s.combo, 90) / 220
+  const comboScale = 1 + Math.min(s.combo, 150) / 360
 
   return (
     <div
@@ -106,7 +106,10 @@ export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
           <span key={`${mult}-${s.comboPulse}`} className={css.mult} data-tier={mult} style={{ scale: String(comboScale) }}>
             &times;{mult}
           </span>
-          <span className={css.comboCount}>{s.combo} in a row</span>
+          <span className={css.tierBar} aria-hidden>
+            <span className={css.tierFill} style={{ transform: `scaleX(${tierProgress(s.combo)})` }} />
+          </span>
+          <span className={css.comboCount}>{mult >= 5 ? `${s.combo} · max` : `${s.combo} / ${COMBO_TIERS[mult]}`}</span>
           {s.comboBreak && (
             <span key={s.comboBreak.id} className={css.crackNum}>
               {s.comboBreak.value}

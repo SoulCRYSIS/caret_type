@@ -1,20 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { accuracy, killScore, maxPlausibleScore, multiplier, waveBonus, wpm } from './scoring'
+import { accuracy, comboAfterMiss, killScore, maxPlausibleScore, multiplier, tierProgress, waveBonus, wpm } from './scoring'
 import { travelTime, waveConfig } from './waves'
 
 describe('scoring', () => {
   it('steps multiplier at combo tiers', () => {
     expect(multiplier(0)).toBe(1)
-    expect(multiplier(11)).toBe(1)
-    expect(multiplier(12)).toBe(2)
+    expect(multiplier(9)).toBe(1)
+    expect(multiplier(10)).toBe(2)
     expect(multiplier(30)).toBe(3)
-    expect(multiplier(500)).toBe(4)
+    expect(multiplier(70)).toBe(4)
+    expect(multiplier(149)).toBe(4)
+    expect(multiplier(150)).toBe(5)
+    expect(multiplier(5000)).toBe(5)
+  })
+
+  it('takes a bite out of the combo on a miss instead of clearing it', () => {
+    expect(comboAfterMiss(85)).toBe(65)
+    expect(multiplier(comboAfterMiss(160))).toBe(4)
+    expect(comboAfterMiss(7)).toBe(0)
+  })
+
+  it('reports progress toward the next tier', () => {
+    expect(tierProgress(0)).toBe(0)
+    expect(tierProgress(20)).toBeCloseTo(0.5)
+    expect(tierProgress(150)).toBe(1)
   })
 
   it('scores kills by length, combo and heaviness', () => {
     expect(killScore(4, 0, false)).toBe(40)
     expect(killScore(4, 30, false)).toBe(120)
     expect(killScore(4, 30, true)).toBe(240)
+    expect(killScore(4, 150, false)).toBe(200)
   })
 
   it('doubles flawless wave bonus', () => {

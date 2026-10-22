@@ -14,7 +14,7 @@ export interface SessionOptions {
   canvas: HTMLCanvasElement
   shakeEl: HTMLElement
   juice: JuiceSettings
-  onOver: (result: RunResult) => void
+  onOver: (result: RunResult, details: unknown) => void
 }
 
 /** Owns one run: the loop, the mode state and the juice systems. Lives outside React. */
@@ -29,7 +29,7 @@ export class GameSession {
   private listeners = new Set<() => void>()
   private simulating = true
   private resizeObserver: ResizeObserver
-  private onOver: (result: RunResult) => void
+  private onOver: (result: RunResult, details: unknown) => void
 
   constructor(opts: SessionOptions) {
     this.mode = opts.mode
@@ -116,8 +116,9 @@ export class GameSession {
     if (this.mode.isOver(this.state)) {
       this.simulating = false
       const result = this.mode.result(this.state, this.ctx)
+      const details = this.mode.details(this.state, this.ctx)
       this.dirty = true
-      queueMicrotask(() => this.onOver(result))
+      queueMicrotask(() => this.onOver(result, details))
     }
   }
 

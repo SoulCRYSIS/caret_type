@@ -1,14 +1,60 @@
 rules_version = '2';
 
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// users/{uid}                         private to the owner
+//   displayName: string|null (<= 100)
+//   photoURL:    string|null (https, <= 2048)
+//   settings:    map (synced preferences, fixed keys)
+//   streak:      map { current, longest, freezes: int; lastPlayedDay: 'YYYY-MM-DD'|null }
+//   stats:       map { gamesPlayed, totalChars, totalKills, bestScore, bestWpm, timePlayedMs: number }
+//   createdAt:   timestamp (set once, immutable)
+//   updatedAt:   timestamp (== request.time on every write)
+//
+// users/{uid}/runs/{runId}            private to the owner, create-only
+//   modeId, language, tier, score, wpm, accuracy, wave, kills, chars, maxCombo,
+//   durationMs, wpmByWave: list<number> (<= 500), startedAt, endedAt (epoch ms),
+//   createdAt: timestamp (== request.time)
+//
+// leaderboards/{boardId}/entries/{uid}  readable by signed-in users, written by the owner
+//   boardId = {mode}_{lang}_{tier}_{period}
+//   uid (== doc id), name (<= 60), photoURL, score, wpm, accuracy, wave, chars,
+//   durationMs, mode, lang, tier, createdAt (== request.time)
+//   Updates must raise the score.
+//
+// These checks stop casual tampering, not a determined cheater: a client can still
+// submit a fabricated-but-plausible run. Server-side replay validation is the next step.
+// ===============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
+    // ---------- helpers ----------
+
+    function isAuthenticated() {
       return request.auth != null;
     }
 
     function isOwner(uid) {
-      return signedIn() && request.auth.uid == uid;
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isInt(v, lo, hi) {
+      return v is int && v >= lo && v <= hi;
+    }
+
+    function isNum(v, lo, hi) {
+      return (v is int || v is float) && v >= lo && v <= hi;
+    }
+
+    function isOptionalString(v, maxLen) {
+      return v == null || (v is string && v.size() <= maxLen);
+    }
+
+    function isOptionalUrl(v) {
+      return v == null || (v is string && v.size() <= 2048 && v.matches('^https://.*'));
     }
 
     function validLang(lang) {
@@ -19,63 +65,139 @@ service cloud.firestore {
       return tier in ['easy', 'medium', 'hard', 'expert'];
     }
 
-    // Mirrors maxPlausibleScore() in src/game/modes/ink-invaders/scoring.ts.
-    function plausibleRun(d) {
-      return d.score is int && d.score >= 0
-        && d.chars is int && d.chars >= 0 && d.chars <= 20000
-        && d.wave is int && d.wave >= 1 && d.wave <= 500
-        && d.wpm is number && d.wpm >= 0 && d.wpm <= 300
-        && d.accuracy is number && d.accuracy >= 0 && d.accuracy <= 1
-        && d.durationMs is number && d.durationMs >= 0 && d.durationMs <= 21600000
-        && d.score <= d.chars * 80 + 100 * d.wave * (d.wave + 1);
+    function validModeId(mode) {
+      return mode is string && mode.matches('^[a-z0-9-]{1,32}$');
     }
+
+    function isHexColor(v) {
+      return v is string && v.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    // Mirrors maxPlausibleScore() in src/game/modes/ink-invaders/scoring.ts,
+    // and wpm can't exceed what chars over duration allow.
+    function plausibleRun(d) {
+      return isInt(d.score, 0, 100000000)
+        && isInt(d.chars, 0, 20000)
+        && isInt(d.wave, 1, 500)
+        && isNum(d.wpm, 0, 300)
+        && isNum(d.accuracy, 0, 1)
+        && isNum(d.durationMs, 0, 21600000)
+        && d.score <= d.chars * 100 + 100 * d.wave * (d.wave + 1)
+        && d.wpm * d.durationMs <= d.chars * 12600 + 60000;
+    }
+
+    // ---------- domain validators ----------
+
+    function isValidSettings(s) {
+      return s is map
+        && s.keys().hasOnly(['modeId', 'language', 'tier', 'paletteId', 'customPalette', 'sound', 'volume', 'shake', 'particles'])
+        && (!('modeId' in s) || validModeId(s.modeId))
+        && (!('language' in s) || validLang(s.language))
+        && (!('tier' in s) || validTier(s.tier))
+        && (!('paletteId' in s) || (s.paletteId is string && s.paletteId.size() <= 32))
+        && (!('customPalette' in s) || (s.customPalette is map
+              && s.customPalette.keys().hasOnly(['paper', 'ink', 'muted', 'accent', 'error'])
+              && isHexColor(s.customPalette.get('paper', '#000000'))
+              && isHexColor(s.customPalette.get('ink', '#000000'))
+              && isHexColor(s.customPalette.get('muted', '#000000'))
+              && isHexColor(s.customPalette.get('accent', '#000000'))
+              && isHexColor(s.customPalette.get('error', '#000000'))))
+        && (!('sound' in s) || s.sound is bool)
+        && (!('volume' in s) || isNum(s.volume, 0, 1))
+        && (!('shake' in s) || s.shake is bool)
+        && (!('particles' in s) || s.particles is bool);
+    }
+
+    function isValidStreak(s) {
+      return s is map
+        && s.keys().hasOnly(['current', 'longest', 'lastPlayedDay', 'freezes'])
+        && isInt(s.current, 0, 100000)
+        && isInt(s.longest, 0, 100000)
+        && isInt(s.freezes, 0, 2)
+        && (s.lastPlayedDay == null || (s.lastPlayedDay is string && s.lastPlayedDay.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')));
+    }
+
+    function isValidStats(s) {
+      return s is map
+        && s.keys().hasOnly(['gamesPlayed', 'totalChars', 'totalKills', 'bestScore', 'bestWpm', 'timePlayedMs'])
+        && isNum(s.gamesPlayed, 0, 10000000)
+        && isNum(s.totalChars, 0, 10000000000)
+        && isNum(s.totalKills, 0, 10000000000)
+        && isNum(s.bestScore, 0, 100000000)
+        && isNum(s.bestWpm, 0, 300)
+        && isNum(s.timePlayedMs, 0, 100000000000000);
+    }
+
+    function isValidUser(d) {
+      return d.keys().hasOnly(['displayName', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt'])
+        && (!('displayName' in d) || isOptionalString(d.displayName, 100))
+        && (!('photoURL' in d) || isOptionalUrl(d.photoURL))
+        && (!('settings' in d) || isValidSettings(d.settings))
+        && (!('streak' in d) || isValidStreak(d.streak))
+        && (!('stats' in d) || isValidStats(d.stats))
+        && d.updatedAt == request.time;
+    }
+
+    function isValidRun(d) {
+      return d.keys().hasOnly([
+          'modeId', 'language', 'tier', 'score', 'wpm', 'accuracy', 'wave', 'kills', 'chars',
+          'maxCombo', 'durationMs', 'wpmByWave', 'startedAt', 'endedAt', 'createdAt'])
+        && d.keys().hasAll([
+          'modeId', 'language', 'tier', 'score', 'wpm', 'accuracy', 'wave', 'kills', 'chars',
+          'maxCombo', 'durationMs', 'wpmByWave', 'startedAt', 'endedAt', 'createdAt'])
+        && validModeId(d.modeId)
+        && validLang(d.language)
+        && validTier(d.tier)
+        && isInt(d.kills, 0, 100000)
+        && isInt(d.maxCombo, 0, 100000)
+        && d.wpmByWave is list && d.wpmByWave.size() <= 500
+        && isNum(d.startedAt, 1600000000000, request.time.toMillis() + 600000)
+        && isNum(d.endedAt, d.startedAt, request.time.toMillis() + 600000)
+        && d.createdAt == request.time
+        && plausibleRun(d);
+    }
+
+    function isValidEntry(d, boardId, uid) {
+      return d.keys().hasOnly([
+          'uid', 'name', 'photoURL', 'score', 'wpm', 'accuracy', 'wave', 'chars',
+          'durationMs', 'mode', 'lang', 'tier', 'createdAt'])
+        && d.keys().hasAll(['uid', 'name', 'score', 'wpm', 'accuracy', 'wave', 'chars', 'durationMs', 'mode', 'lang', 'tier', 'createdAt'])
+        && d.uid == uid
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && (!('photoURL' in d) || isOptionalUrl(d.photoURL))
+        && validModeId(d.mode)
+        && validLang(d.lang)
+        && validTier(d.tier)
+        && boardId.matches(d.mode + '_' + d.lang + '_' + d.tier + '_(all|week-[0-9]{4}-W[0-9]{2}|day-[0-9]{4}-[0-9]{2}-[0-9]{2})')
+        && d.createdAt == request.time
+        && plausibleRun(d);
+    }
+
+    // ---------- rules ----------
 
     match /users/{uid} {
       allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(
-          ['displayName', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt']);
+      allow create: if isOwner(uid)
+        && isValidUser(request.resource.data)
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time);
+      allow update: if isOwner(uid)
+        && isValidUser(request.resource.data)
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null);
       allow delete: if false;
 
       match /runs/{runId} {
         allow read: if isOwner(uid);
-        allow create: if isOwner(uid)
-          && request.resource.data.keys().hasOnly([
-            'modeId', 'language', 'tier', 'score', 'wpm', 'accuracy', 'wave', 'kills', 'chars',
-            'maxCombo', 'durationMs', 'wpmByWave', 'startedAt', 'endedAt', 'createdAt'])
-          && request.resource.data.modeId is string
-          && validLang(request.resource.data.language)
-          && validTier(request.resource.data.tier)
-          && request.resource.data.wpmByWave is list
-          && request.resource.data.wpmByWave.size() <= 500
-          && request.resource.data.createdAt == request.time
-          && plausibleRun(request.resource.data);
+        allow create: if isOwner(uid) && isValidRun(request.resource.data);
         allow update, delete: if false;
       }
     }
 
     match /leaderboards/{boardId}/entries/{uid} {
-      allow read: if signedIn();
-
-      function validEntry() {
-        let d = request.resource.data;
-        return d.keys().hasOnly([
-            'uid', 'name', 'photoURL', 'score', 'wpm', 'accuracy', 'wave', 'chars',
-            'durationMs', 'mode', 'lang', 'tier', 'createdAt'])
-          && d.keys().hasAll(['uid', 'name', 'score', 'wpm', 'accuracy', 'wave', 'chars', 'mode', 'lang', 'tier', 'createdAt'])
-          && d.uid == uid
-          && d.name is string && d.name.size() <= 60
-          && (!('photoURL' in d) || d.photoURL == null || (d.photoURL is string && d.photoURL.size() <= 2048))
-          && d.mode is string && d.mode.matches('[a-z0-9-]{1,32}')
-          && validLang(d.lang)
-          && validTier(d.tier)
-          && boardId.matches(d.mode + '_' + d.lang + '_' + d.tier + '_.*')
-          && d.createdAt == request.time
-          && plausibleRun(d);
-      }
-
-      allow create: if isOwner(uid) && validEntry();
-      allow update: if isOwner(uid) && validEntry() && request.resource.data.score > resource.data.score;
+      allow read: if isAuthenticated();
+      allow create: if isOwner(uid) && isValidEntry(request.resource.data, boardId, uid);
+      allow update: if isOwner(uid)
+        && isValidEntry(request.resource.data, boardId, uid)
+        && request.resource.data.score > resource.data.score;
       allow delete: if false;
     }
   }

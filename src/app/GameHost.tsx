@@ -3,7 +3,7 @@ import { isUiTarget, normalizeKey } from '../game/engine/input'
 import { GameSession } from '../game/engine/session'
 import { synth } from '../game/juice/juice'
 import { getMode } from '../game/modes/registry'
-import type { RunResult } from '../game/modes/types'
+import type { AnyGameMode, RunResult } from '../game/modes/types'
 import { getLanguage } from '../game/words/languages'
 import { loadWords } from '../game/words/loader'
 import { WordPicker } from '../game/words/picker'
@@ -27,6 +27,8 @@ function IdleCard({ ready, error }: { ready: boolean; error: boolean }) {
   const language = useSettings((s) => s.language)
   const modeId = useSettings((s) => s.modeId)
   const lang = getLanguage(language)
+  const Intro = getMode(modeId).Intro
+  if (Intro) return <Intro ready={ready} error={error} />
   return (
     <div className={css.idle}>
       <div className={css.idleStamp}>
@@ -105,7 +107,7 @@ export function GameHost() {
   const [session, setSession] = useState<GameSession | null>(null)
   const [words, setWords] = useState<string[] | null>(null)
   const [wordsError, setWordsError] = useState(false)
-  const [result, setResult] = useState<{ run: RunResult; recorded: Recorded } | null>(null)
+  const [result, setResult] = useState<{ run: RunResult; details: unknown; mode: AnyGameMode; recorded: Recorded } | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -131,8 +133,9 @@ export function GameHost() {
     ;(document.activeElement as HTMLElement | null)?.blur?.()
     synth.unlock()
     const { sound, volume, shake, particles } = useSettings.getState()
+    const mode = getMode(modeId)
     const s = new GameSession({
-      mode: getMode(modeId),
+      mode,
       words: new WordPicker(words),
       language,
       tier,
@@ -140,9 +143,9 @@ export function GameHost() {
       canvas: canvasRef.current,
       shakeEl: shakeRef.current,
       juice: { sound, volume, shake, particles },
-      onOver: (run) => {
+      onOver: (run, details) => {
         overAt.current = performance.now()
-        setResult({ run, recorded: recordRun(run) })
+        setResult({ run, details, mode, recorded: recordRun(run) })
         useGameUi.getState().setPhase('over')
       },
     })
@@ -222,6 +225,7 @@ export function GameHost() {
           break
         case 'over':
           if (performance.now() - overAt.current < 600) return
+          if ((k.kind === 'enter' || k.kind === 'space') && e.target instanceof HTMLElement && e.target.closest('button, a')) return
           if (k.kind === 'enter') {
             e.preventDefault()
             start()
@@ -269,7 +273,7 @@ export function GameHost() {
       )}
       {phase === 'over' && result && (
         <div className={css.overlay}>
-          <ResultSheet run={result.run} recorded={result.recorded} />
+          <ResultSheet run={result.run} details={result.details} mode={result.mode} recorded={result.recorded} />
         </div>
       )}
     </>

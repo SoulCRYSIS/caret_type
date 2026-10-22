@@ -22,6 +22,8 @@ export interface Enemy {
   jitter: number
   danger: boolean
   landed: boolean
+  /** Elapsed seconds when the player locked onto this word. */
+  lockedAt: number
   el: HTMLElement | null
   w: number
   h: number
@@ -35,6 +37,22 @@ export interface Banner {
 }
 
 export type Phase = 'intro' | 'wave' | 'intermission' | 'dying' | 'over'
+
+export interface InkedWord {
+  word: string
+  /** Seconds from first keystroke on the word to the kill. */
+  secs: number
+  heavy: boolean
+  wave: number
+}
+
+/** What the result card reports about an Ink Invaders run. */
+export interface InkDetails {
+  inked: InkedWord[]
+  spilled: string[]
+  flawlessWaves: number
+  wavesCleared: number
+}
 
 export interface InkState {
   phase: Phase
@@ -67,6 +85,10 @@ export interface InkState {
   errors: number
   kills: number
   wpmByWave: number[]
+  inked: InkedWord[]
+  spilled: string[]
+  flawlessWaves: number
+  wavesCleared: number
   startedAt: number
   endedAt: number
 

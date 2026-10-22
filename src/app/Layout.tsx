@@ -47,7 +47,9 @@ function PaletteQuick() {
 
 export function Layout({ children }: { children: ReactNode }) {
   const hidden = useFocusMode()
-  const solid = useLocation().pathname !== '/'
+  const onPlay = useLocation().pathname === '/'
+  const phase = useGameUi((s) => s.phase)
+  const solid = !onPlay || phase === 'over'
   usePeekOnMouseMove()
 
   return (
@@ -76,7 +78,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className={css.main}>{children}</main>
 
       <footer className={css.footer} data-hidden={hidden} data-solid={solid}>
-        <div className={css.hints}>
+        <div className={css.hints} data-hidden={onPlay && phase === 'over'}>
           <span className={css.hint}>
             <Kbd>tab</Kbd> new run
           </span>

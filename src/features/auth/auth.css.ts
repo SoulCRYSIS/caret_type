@@ -1,4 +1,4 @@
-import { style } from '@vanilla-extract/css'
+import { globalStyle, style } from '@vanilla-extract/css'
 import { tone, vars } from '../../theme/contract.css'
 
 export const providers = style({
@@ -8,17 +8,85 @@ export const providers = style({
   alignItems: 'stretch',
 })
 
-export const providerGlyph = style({
-  display: 'inline-grid',
-  placeItems: 'center',
-  width: 20,
-  height: 20,
-  borderRadius: '50%',
-  border: `1.5px solid currentColor`,
+export const providerGrid = style({
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 8,
+})
+
+globalStyle(`${providerGrid} > button`, { padding: '7px 10px', fontSize: 13, gap: 8 })
+
+export const provider = style({
+  justifyContent: 'flex-start',
+  gap: 12,
+})
+
+export const providerIcon = style({
+  width: 18,
+  height: 18,
+  flexShrink: 0,
+})
+
+export const or = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  fontFamily: vars.font.mono,
+  fontSize: 11,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: vars.color.muted,
+  '::before': { content: '""', flex: 1, height: 1, background: tone.rule },
+  '::after': { content: '""', flex: 1, height: 1, background: tone.rule },
+})
+
+export const form = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  minWidth: 250,
+})
+
+export const formTitle = style({
   fontFamily: vars.font.display,
-  fontWeight: 700,
-  fontSize: 12,
-  lineHeight: 1,
+  fontStyle: 'italic',
+  fontSize: 18,
+})
+
+export const field = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+})
+
+export const fieldLabel = style({
+  fontVariant: 'small-caps',
+  letterSpacing: '0.08em',
+  fontSize: 13,
+  color: vars.color.muted,
+})
+
+export const input = style({
+  font: 'inherit',
+  fontFamily: vars.font.mono,
+  fontSize: 14,
+  color: vars.color.ink,
+  background: 'transparent',
+  border: 'none',
+  borderBottom: `1.5px solid ${tone.ruleStrong}`,
+  padding: '6px 2px',
+  outline: 'none',
+  transition: 'border-color .15s',
+  ':focus': { borderBottomColor: vars.color.accent },
+  '::placeholder': { color: vars.color.muted, opacity: 0.6 },
+})
+
+export const formLinks = style({
+  display: 'flex',
+  flexWrap: 'wrap',
+  columnGap: 14,
+  rowGap: 4,
+  fontSize: 13,
 })
 
 export const note = style({

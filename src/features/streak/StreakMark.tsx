@@ -1,4 +1,5 @@
 import { Tip } from '../../ui'
+import { useAuth } from '../auth/authStore'
 import { useProgress } from '../progress/progressStore'
 import { viewStreak, type StreakEvent } from './streak'
 import * as css from './streak.css'
@@ -33,8 +34,20 @@ const STATUS_TEXT = {
 
 export function StreakMark() {
   const streak = useProgress((s) => s.streak)
+  const authStatus = useAuth((s) => s.status)
   const today = useToday()
   const { count, status } = viewStreak(streak, today)
+  if (authStatus === 'guest') {
+    return (
+      <Tip content="sign in to keep a daily streak — today's runs will count">
+        <span className={css.mark} data-status="none" tabIndex={0} aria-label="streak needs an account">
+          <Tally count={0} />
+          <span className={css.note}>streak</span>
+        </span>
+      </Tip>
+    )
+  }
+  if (authStatus === 'loading') return null
   return (
     <Tip content={STATUS_TEXT[status]}>
       <span className={css.mark} data-status={status} tabIndex={0} aria-label={`${count} day streak. ${STATUS_TEXT[status]}`}>

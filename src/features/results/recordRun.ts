@@ -29,8 +29,26 @@ export function recordRun(run: RunResult): Recorded {
       .then((result): BoardStatus => ({ kind: 'done', result }))
       .catch((err): BoardStatus => {
         console.error(err)
+        useProgress.getState().queue(run)
         return { kind: 'error' }
       })
 
   return { ...outcome, board }
+}
+
+/**
+ * A guest run is queued locally and uploaded by the sign-in sync.
+ * Once that sync has finished, look up where it landed.
+ */
+export async function claimBoard(run: RunResult): Promise<BoardStatus> {
+  const user = currentFirebaseUser()
+  if (!user) return { kind: 'guest' }
+  if (useProgress.getState().unsynced.some((r) => r.startedAt === run.startedAt)) return { kind: 'error' }
+  try {
+    const svc = await loadService()
+    return { kind: 'done', result: await svc.standingFor(user, run) }
+  } catch (err) {
+    console.error(err)
+    return { kind: 'error' }
+  }
 }

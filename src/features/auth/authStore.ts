@@ -30,6 +30,7 @@ export const useAuth = create<AuthStore>(() => ({
 type Service = typeof import('./service')
 let servicePromise: Promise<Service> | null = null
 let firebaseUser: User | null = null
+let signUpPending: Promise<unknown> | null = null
 
 export function loadService(): Promise<Service> {
   servicePromise ??= import('./service')
@@ -73,6 +74,8 @@ export function initAuth(): void {
           useAuth.setState({ status: 'guest', user: null, syncing: false })
           return
         }
+        // A brand-new email account signs in before its display name is set; wait so the name reaches the standings.
+        if (signUpPending) await signUpPending.catch(() => null)
         useAuth.setState({ status: 'user', user: { uid: u.uid, displayName: u.displayName, photoURL: u.photoURL }, syncing: true, error: null })
         try {
           const remote = await svc.syncOnSignIn(u, useSettings.getState())
@@ -95,14 +98,80 @@ export function initAuth(): void {
     })
 }
 
-export async function signIn(provider: ProviderId): Promise<void> {
+const AUTH_ERRORS: Record<string, string> = {
+  'auth/invalid-credential': "That email and password don't match.",
+  'auth/wrong-password': "That email and password don't match.",
+  'auth/user-not-found': "That email and password don't match.",
+  'auth/invalid-email': "That email doesn't look right.",
+  'auth/missing-password': 'Enter your password.',
+  'auth/email-already-in-use': 'That email already has an account. Sign in instead.',
+  'auth/weak-password': 'Use a password of at least 6 characters.',
+  'auth/too-many-requests': 'Too many tries. Wait a minute and try again.',
+  'auth/network-request-failed': 'No connection. Check your network and try again.',
+  'auth/operation-not-allowed': "This sign-in method isn't switched on yet. Try another one.",
+  'auth/account-exists-with-different-credential': 'That email already signed in another way. Use the method you used first.',
+  'auth/user-disabled': 'This account has been disabled.',
+}
+
+function authError(err: unknown, fallback: string): string {
+  const code = (err as { code?: string } | null)?.code
+  return (code && AUTH_ERRORS[code]) || fallback
+}
+
+export function clearAuthError(): void {
+  useAuth.setState({ error: null })
+}
+
+export async function signIn(provider: ProviderId): Promise<boolean> {
   useAuth.setState({ error: null })
   try {
     const svc = await loadService()
     await svc.signInWith(provider)
+    return true
   } catch (err) {
     console.error(err)
-    useAuth.setState({ error: 'Sign-in failed. Please try again.' })
+    useAuth.setState({ error: authError(err, 'Sign-in failed. Please try again.') })
+    return false
+  }
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<boolean> {
+  useAuth.setState({ error: null })
+  try {
+    const svc = await loadService()
+    await svc.emailSignIn(email.trim(), password)
+    return true
+  } catch (err) {
+    useAuth.setState({ error: authError(err, 'Sign-in failed. Please try again.') })
+    return false
+  }
+}
+
+export async function signUpWithEmail(name: string, email: string, password: string): Promise<boolean> {
+  useAuth.setState({ error: null })
+  const displayName = name.trim() || email.trim().split('@')[0]
+  try {
+    const svc = await loadService()
+    signUpPending = svc.emailSignUp(displayName, email.trim(), password)
+    await signUpPending
+    return true
+  } catch (err) {
+    useAuth.setState({ error: authError(err, "Couldn't create the account. Please try again.") })
+    return false
+  } finally {
+    signUpPending = null
+  }
+}
+
+export async function resetPassword(email: string): Promise<boolean> {
+  useAuth.setState({ error: null })
+  try {
+    const svc = await loadService()
+    await svc.emailReset(email.trim())
+    return true
+  } catch (err) {
+    useAuth.setState({ error: authError(err, "Couldn't send the reset email. Please try again.") })
+    return false
   }
 }
 

@@ -79,6 +79,8 @@ export const hints = style({
   display: 'flex',
   alignItems: 'center',
   gap: 18,
+  transition: 'opacity .3s',
+  selectors: { '&[data-hidden="true"]': { opacity: 0, pointerEvents: 'none' } },
   '@media': { 'screen and (max-width: 640px)': { display: 'none' } },
 })
 

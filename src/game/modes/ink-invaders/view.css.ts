@@ -216,7 +216,28 @@ export const mult = style({
     '&[data-tier="2"]': { color: vars.color.ink },
     '&[data-tier="3"]': { color: vars.color.accent },
     '&[data-tier="4"]': { color: vars.color.accent, textShadow: `2px 2px 0 ${tone.accentWash}` },
+    '&[data-tier="5"]': { color: vars.color.accent, fontSize: 40, textShadow: `3px 3px 0 ${tone.accentWash}, -1px -1px 0 ${tone.accentWash}` },
   },
+})
+
+export const tierBar = style({
+  display: 'block',
+  width: 96,
+  height: 3,
+  marginLeft: 'auto',
+  marginTop: 6,
+  marginBottom: 4,
+  background: tone.rule,
+  position: 'relative',
+  overflow: 'hidden',
+})
+
+export const tierFill = style({
+  position: 'absolute',
+  inset: 0,
+  transformOrigin: 'left center',
+  background: vars.color.accent,
+  transition: `transform .18s ${ease.out}`,
 })
 
 export const comboCount = style({
@@ -240,8 +261,6 @@ export const crackNum = style({
   fontFamily: vars.font.mono,
   fontSize: 15,
   color: vars.color.error,
-  textDecoration: 'line-through',
-  textDecorationThickness: 2,
   animation: `${crack} .75s ${ease.out} forwards`,
 })
 

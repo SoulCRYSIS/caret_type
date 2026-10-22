@@ -51,9 +51,10 @@ interface ProgressStore {
   streak: StreakState
   stats: Stats
   history: RunResult[]
-  /** Guest runs not yet uploaded to an account. */
+  /** Runs not yet uploaded to an account: guest runs, or saves that failed. */
   unsynced: RunResult[]
   record: (run: RunResult) => RecordOutcome
+  queue: (run: RunResult) => void
   adopt: (uid: string, streak: StreakState, stats: Stats) => void
   clearUnsynced: () => void
   reset: () => void
@@ -86,6 +87,12 @@ export const useProgress = create<ProgressStore>()(
           unsynced: st.ownerUid ? st.unsynced : [...st.unsynced, run].slice(-HISTORY),
         })
         return { streakEvent, streak, qualified, personalBest }
+      },
+
+      queue(run) {
+        const { unsynced } = get()
+        if (unsynced.some((r) => r.startedAt === run.startedAt)) return
+        set({ unsynced: [...unsynced, run].slice(-HISTORY) })
       },
 
       adopt(uid, streak, stats) {
