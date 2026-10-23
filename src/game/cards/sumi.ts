@@ -1,5 +1,6 @@
 /** Sumi-e brush helpers: ensō, brush strokes, hanko seals, washi paper. */
 
+import { drawMark } from '../../theme/mark'
 import type { Rand } from './print'
 
 /** Vermilion seal ink (shuniku) — the same on every palette. */
@@ -183,7 +184,9 @@ export function washi(g: CanvasRenderingContext2D, x: number, y: number, w: numb
 
 export interface HankoSpec {
   /** Lines of text, top to bottom; each is fitted to the seal's width. */
-  lines: string[]
+  lines?: string[]
+  /** Carve the caret mark instead of text. */
+  mark?: boolean
   size: number
   color: string
   font: string
@@ -214,13 +217,15 @@ export function hanko(g: CanvasRenderingContext2D, cx: number, cy: number, spec:
     s.stroke()
   }
 
-  const rows = spec.lines.length
+  const lines = spec.lines ?? []
+  const rows = lines.length
   const inner = size * 0.76
-  const rowH = inner / rows
+  const rowH = inner / Math.max(1, rows)
   s.textAlign = 'center'
   s.textBaseline = 'middle'
   s.globalCompositeOperation = filled ? 'destination-out' : 'source-over'
-  spec.lines.forEach((line, i) => {
+  if (spec.mark) drawMark(s, x0 + size / 2, x0 + size / 2, size * 0.92, spec.color, spec.color)
+  lines.forEach((line, i) => {
     let px = rowH * 0.92
     s.font = spec.font.replace(/\d+px/, `${Math.round(px)}px`)
     const w = s.measureText(line).width

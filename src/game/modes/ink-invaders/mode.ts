@@ -310,7 +310,9 @@ export const inkInvaders: GameMode<InkState, InkDetails> = {
         s.spawnTimer -= dt
         const pending = s.toSpawn + s.heaviesLeft
         if (s.spawnTimer <= 0 && pending > 0 && s.enemies.length < s.cfg.maxActive) {
-          const heavyNow = s.heaviesLeft > 0 && (s.toSpawn <= s.cfg.count / 2 || s.toSpawn === 0)
+          // the opening words are always light; after that heavies are mixed in evenly
+          const opened = s.cfg.count - s.toSpawn >= 2
+          const heavyNow = s.heaviesLeft > 0 && (s.toSpawn === 0 || (opened && Math.random() < s.heaviesLeft / pending))
           if (heavyNow) s.heaviesLeft--
           else s.toSpawn--
           spawn(s, ctx, heavyNow)

@@ -6,6 +6,7 @@ import { useSettings } from '../features/settings/settingsStore'
 import { StreakMark } from '../features/streak/StreakMark'
 import { PALETTES, CUSTOM_PALETTE_ID } from '../theme/palettes'
 import { Button, Kbd, Popover } from '../ui'
+import { CaretMark } from '../ui/CaretMark'
 import * as ui from '../ui/ui.css'
 import { useFocusMode, useGameUi } from './gameUiStore'
 import * as css from './layout.css'
@@ -56,8 +57,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <>
       <header className={css.header} data-hidden={hidden} data-solid={solid}>
         <Link to="/" className={css.wordmark} aria-label="caret — play">
-          caret
-          <span className={css.wordmarkCaret} aria-hidden />
+          <CaretMark className={css.wordmarkMark} />
         </Link>
         <nav className={css.nav}>
           <StreakMark />

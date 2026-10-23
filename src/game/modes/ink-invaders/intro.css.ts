@@ -71,13 +71,16 @@ export const titleSpine = style({
   color: vars.color.ink,
 })
 
+export const sealMark = style({
+  display: 'block',
+  width: 'clamp(22px, 4vh, 32px)',
+  height: 'clamp(22px, 4vh, 32px)',
+})
+
 export const seal = style({
   marginTop: 6,
-  padding: '6px 6px 5px',
-  fontFamily: FONT_BRUSH,
-  fontSize: 'clamp(10px, 1.8vh, 13px)',
-  letterSpacing: '0.04em',
-  lineHeight: 1,
+  padding: 3,
+  lineHeight: 0,
   color: vars.color.paper,
   background: SEAL_RED,
   borderRadius: 3,

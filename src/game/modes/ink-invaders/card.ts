@@ -1,4 +1,5 @@
 import { FONT_BRUSH } from '../../../theme/fonts'
+import { drawMark } from '../../../theme/mark'
 import { fitSize, flick, font, grain, mix, seeded, tracking, type Rand } from '../../cards/print'
 import { brushStroke, enso, hanko, SEAL_RED, spineText, washi } from '../../cards/sumi'
 import { getLanguage } from '../../words/languages'
@@ -124,7 +125,7 @@ export const inkCard: ModeCard<InkDetails> = {
     const titleSize = fitSize(g, 'Ink Invaders', 600, 92, (s) => font(s, FONT_BRUSH))
     g.font = font(titleSize, FONT_BRUSH)
     const titleEnd = spineText(g, 'Ink Invaders', colX, BAND + 70)
-    hanko(g, colX, titleEnd + 66, { lines: ['CARET'], size: 74, color: seal, font: font(30, FONT_BRUSH) }, rand)
+    hanko(g, colX, titleEnd + 66, { mark: true, size: 74, color: seal, font: font(30, FONT_BRUSH) }, rand)
 
     // the ensō, holding the score
     const cx = 440
@@ -202,13 +203,13 @@ export const inkCard: ModeCard<InkDetails> = {
     const seals: string[][] = []
     if (input.streak && input.streak > 0) seals.push([String(input.streak), input.streak === 1 ? 'DAY' : 'DAYS'])
     if (input.rank) seals.push(['RANK', `#${input.rank}`])
-    if (seals.length === 0) seals.push(['INK'])
+    if (seals.length === 0) seals.push([])
     seals.forEach((lines, i) => {
       hanko(
         g,
         sigX - (seals.length - 1) * 48 + i * 96,
         1218,
-        { lines, size: 80, color: seal, font: font(30, FONT_BRUSH), angle: (rand() - 0.5) * 0.1, filled: i === 0 },
+        { lines, mark: lines.length === 0, size: 80, color: seal, font: font(30, FONT_BRUSH), angle: (rand() - 0.5) * 0.1, filled: i === 0 },
         rand,
       )
     })
@@ -219,7 +220,8 @@ export const inkCard: ModeCard<InkDetails> = {
     tracking(g, 3)
     g.textBaseline = 'middle'
     g.textAlign = 'left'
-    g.fillText('CARET · TYPE IN INK', 52, H - BAND / 2)
+    drawMark(g, 66, H - BAND / 2, 34, mix(band, colors.ink, 0.8), colors.accent)
+    g.fillText('TYPE IN INK', 92, H - BAND / 2)
     g.textAlign = 'right'
     g.fillText(input.site.toUpperCase(), W - 52, H - BAND / 2)
     tracking(g, 0)

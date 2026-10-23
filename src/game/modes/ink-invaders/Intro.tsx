@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useSettings } from '../../../features/settings/settingsStore'
+import { CaretMark } from '../../../ui/CaretMark'
 import { readCssColor } from '../../../theme/palettes'
 import { seeded } from '../../cards/print'
 import { enso } from '../../cards/sumi'
@@ -67,7 +68,7 @@ export function InkIntro({ ready, error }: IntroProps) {
             Ink Invaders
           </span>
           <span className={css.seal} aria-hidden>
-            CARET
+            <CaretMark className={css.sealMark} dot="currentColor" />
           </span>
         </div>
       </div>

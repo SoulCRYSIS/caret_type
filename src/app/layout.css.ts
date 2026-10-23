@@ -1,5 +1,5 @@
-import { keyframes, style } from '@vanilla-extract/css'
-import { tone, vars } from '../theme/contract.css'
+import { globalStyle, keyframes, style } from '@vanilla-extract/css'
+import { ease, tone, vars } from '../theme/contract.css'
 
 const chrome = style({
   position: 'fixed',
@@ -43,25 +43,20 @@ const blink = keyframes({ '0%, 49%': { opacity: 1 }, '50%, 100%': { opacity: 0 }
 
 export const wordmark = style({
   display: 'inline-flex',
-  alignItems: 'baseline',
-  fontFamily: vars.font.display,
-  fontStyle: 'italic',
-  fontSize: 26,
-  fontWeight: 500,
-  letterSpacing: '-0.03em',
+  alignItems: 'center',
   textDecoration: 'none',
   color: vars.color.ink,
+  transition: `transform .2s ${ease.spring}`,
+  ':hover': { transform: 'translateY(-1px) rotate(-4deg)' },
 })
 
-export const wordmarkCaret = style({
-  display: 'inline-block',
-  width: 2,
-  height: 22,
-  marginLeft: 3,
-  alignSelf: 'center',
-  background: vars.color.accent,
-  animation: `${blink} 1.05s steps(1) infinite`,
+export const wordmarkMark = style({
+  width: 38,
+  height: 38,
+  display: 'block',
 })
+
+globalStyle(`${wordmarkMark} circle`, { animation: `${blink} 1.05s steps(1) infinite` })
 
 export const nav = style({
   display: 'flex',
