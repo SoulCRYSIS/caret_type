@@ -1,36 +1,43 @@
 import { describe, expect, it } from 'vitest'
-import { accuracy, comboAfterMiss, killScore, maxPlausibleScore, multiplier, tierProgress, waveBonus, wpm } from './scoring'
-import { TARGET_WPM, travelTime, waveConfig } from './waves'
+import { accuracy, comboAfterMiss, killScore, maxPlausibleScore, MISS_COMBO_PENALTY, multiplier, tierProgress, waveBonus, wpm } from './scoring'
+import { DEATH_WAVE, DOUBLING_WAVES, expectedDeathWave, TARGET_WPM, travelTime, waveConfig } from './waves'
 
 describe('scoring', () => {
   it('steps multiplier at combo tiers', () => {
     expect(multiplier(0)).toBe(1)
-    expect(multiplier(9)).toBe(1)
-    expect(multiplier(10)).toBe(2)
-    expect(multiplier(30)).toBe(3)
-    expect(multiplier(70)).toBe(4)
-    expect(multiplier(149)).toBe(4)
-    expect(multiplier(150)).toBe(5)
-    expect(multiplier(5000)).toBe(5)
+    expect(multiplier(19)).toBe(1)
+    expect(multiplier(20)).toBe(2)
+    expect(multiplier(50)).toBe(3)
+    expect(multiplier(150)).toBe(4)
+    expect(multiplier(400)).toBe(5)
+    expect(multiplier(999)).toBe(5)
+    expect(multiplier(1000)).toBe(6)
+    expect(multiplier(5000)).toBe(6)
   })
 
   it('takes a bite out of the combo on a miss instead of clearing it', () => {
-    expect(comboAfterMiss(85)).toBe(65)
-    expect(multiplier(comboAfterMiss(160))).toBe(4)
-    expect(comboAfterMiss(7)).toBe(0)
+    expect(comboAfterMiss(85, 'medium')).toBe(85 - MISS_COMBO_PENALTY.medium)
+    expect(comboAfterMiss(MISS_COMBO_PENALTY.medium - 1, 'medium')).toBe(0)
+  })
+
+  it('takes a bigger bite on harder tiers', () => {
+    const tiers = ['easy', 'medium', 'hard', 'expert'] as const
+    for (let i = 1; i < tiers.length; i++) {
+      expect(comboAfterMiss(100, tiers[i])).toBeLessThan(comboAfterMiss(100, tiers[i - 1]))
+    }
   })
 
   it('reports progress toward the next tier', () => {
     expect(tierProgress(0)).toBe(0)
-    expect(tierProgress(20)).toBeCloseTo(0.5)
-    expect(tierProgress(150)).toBe(1)
+    expect(tierProgress(10)).toBeCloseTo(0.5)
+    expect(tierProgress(1000)).toBe(1)
   })
 
   it('scores kills by length, combo and heaviness', () => {
     expect(killScore(4, 0, false)).toBe(40)
-    expect(killScore(4, 30, false)).toBe(120)
-    expect(killScore(4, 30, true)).toBe(240)
-    expect(killScore(4, 150, false)).toBe(200)
+    expect(killScore(4, 50, false)).toBe(120)
+    expect(killScore(4, 50, true)).toBe(240)
+    expect(killScore(4, 1000, false)).toBe(240)
   })
 
   it('doubles flawless wave bonus', () => {
@@ -48,7 +55,7 @@ describe('scoring', () => {
   it('bounds plausible score above any real run', () => {
     const chars = 400
     const wave = 8
-    const realisticMax = killScore(chars, 999, true) + Array.from({ length: wave }, (_, i) => waveBonus(i + 1, true)).reduce((a, b) => a + b)
+    const realisticMax = killScore(chars, 99999, true) + Array.from({ length: wave }, (_, i) => waveBonus(i + 1, true)).reduce((a, b) => a + b)
     expect(maxPlausibleScore(chars, wave)).toBeGreaterThanOrEqual(realisticMax)
   })
 })
@@ -81,17 +88,32 @@ describe('waves', () => {
     const tiers = (['easy', 'medium', 'hard', 'expert'] as const).map((t) => waveConfig(1, t, 'en'))
     for (let i = 1; i < tiers.length; i++) {
       expect(tiers[i].count).toBeGreaterThan(tiers[i - 1].count)
-      expect(tiers[i].travel).toBeLessThan(tiers[i - 1].travel)
+      expect(tiers[i].perChar).toBeLessThan(tiers[i - 1].perChar)
       expect(tiers[i].demandWpm).toBeGreaterThan(tiers[i - 1].demandWpm)
     }
   })
 
-  it('asks each tier for its target speed around wave 10', () => {
+  it('drops words faster every wave', () => {
     for (const t of ['easy', 'medium', 'hard', 'expert'] as const) {
-      const ratio = waveConfig(10, t, 'en').demandWpm / TARGET_WPM[t]
-      expect(ratio).toBeGreaterThan(0.9)
-      expect(ratio).toBeLessThan(1.1)
+      for (let w = 1; w < 30; w++) expect(waveConfig(w + 1, t, 'en').travel).toBeLessThan(waveConfig(w, t, 'en').travel)
     }
+  })
+
+  it('ends a target-speed run in wave 10, and each doubling of speed buys ten more waves', () => {
+    for (const t of ['easy', 'medium', 'hard', 'expert'] as const) {
+      for (const lang of ['en', 'th'] as const) {
+        const T = TARGET_WPM[t]
+        expect(Math.floor(expectedDeathWave(t, lang, T))).toBe(DEATH_WAVE)
+        expect(expectedDeathWave(t, lang, 2 * T)).toBeCloseTo(DEATH_WAVE + DOUBLING_WAVES, -0.5)
+        expect(expectedDeathWave(t, lang, 4 * T)).toBeCloseTo(DEATH_WAVE + 2 * DOUBLING_WAVES, -0.5)
+      }
+    }
+  })
+
+  it('doubles the pace every ten waves', () => {
+    const d = (w: number) => waveConfig(w, 'medium', 'en').demandWpm
+    expect(d(20) / d(10)).toBeCloseTo(2, 5)
+    expect(d(30) / d(20)).toBeCloseTo(2, 5)
   })
 
   it('gives longer words and heavies more time', () => {

@@ -1,5 +1,68 @@
-import { globalStyle, style } from '@vanilla-extract/css'
+import { globalStyle, keyframes, style } from '@vanilla-extract/css'
 import { tone, vars } from '../../theme/contract.css'
+
+const fadeIn = keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
+const riseIn = keyframes({ from: { opacity: 0, transform: 'translate(-50%, -46%)' }, to: { opacity: 1, transform: 'translate(-50%, -50%)' } })
+
+export const overlay = style({
+  position: 'fixed',
+  inset: 0,
+  zIndex: 400,
+  background: `color-mix(in srgb, ${vars.color.paper} 72%, transparent)`,
+  backdropFilter: 'blur(2px)',
+  animation: `${fadeIn} .2s ease-out`,
+})
+
+export const dialog = style({
+  position: 'fixed',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  zIndex: 401,
+  width: 'min(340px, calc(100vw - 32px))',
+  padding: 24,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  background: vars.color.paper,
+  color: vars.color.ink,
+  border: `1px solid ${tone.ruleStrong}`,
+  borderRadius: 2,
+  boxShadow: `4px 5px 0 ${tone.shadow}`,
+  animation: `${riseIn} .22s ease-out`,
+  outline: 'none',
+})
+
+export const verify = style({
+  position: 'fixed',
+  top: 64,
+  left: 16,
+  right: 16,
+  zIndex: 40,
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  justifyContent: 'center',
+  columnGap: 16,
+  rowGap: 4,
+  padding: '8px 16px',
+  fontSize: 13,
+  color: vars.color.ink,
+  background: vars.color.paper,
+  border: `1px dashed ${tone.ruleStrong}`,
+  textAlign: 'center',
+})
+
+export const verifyActions = style({
+  display: 'inline-flex',
+  gap: 14,
+})
+
+export const dialogNote = style({
+  margin: 0,
+  fontSize: 13,
+  color: vars.color.muted,
+})
 
 export const providers = style({
   display: 'flex',
@@ -15,6 +78,7 @@ export const providerGrid = style({
 })
 
 globalStyle(`${providerGrid} > button`, { padding: '7px 10px', fontSize: 13, gap: 8 })
+globalStyle(`${providerGrid} > button:last-child:nth-child(odd)`, { gridColumn: '1 / -1' })
 
 export const provider = style({
   justifyContent: 'flex-start',

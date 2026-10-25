@@ -7,9 +7,7 @@ import { inkCard } from './card'
 import type { Enemy, InkDetails, InkState } from './state'
 import { InkIntro } from './Intro'
 import { InkInvadersView } from './View'
-import { travelTime, waveConfig } from './waves'
-
-const MAX_LIVES = 5
+import { MAX_LIVES, travelTime, waveConfig } from './waves'
 const ENEMY_FONT_PX = 22
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
@@ -121,8 +119,7 @@ function removeEnemy(s: InkState, e: Enemy) {
 }
 
 /** A mistype chips the combo; a breach clears it. */
-function breakCombo(s: InkState, hard: boolean) {
-  const next = hard ? 0 : comboAfterMiss(s.combo)
+function breakCombo(s: InkState, next: number) {
   const lost = s.combo - next
   if (lost >= 5) s.comboBreak = { id: ++s.fxId, value: -lost }
   s.combo = next
@@ -174,7 +171,7 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
   s.combo++
   s.maxCombo = Math.max(s.maxCombo, s.combo)
   juice.audio.clack(s.combo)
-  e.y = Math.max(0, e.y - 0.0045)
+  e.y = Math.max(0, e.y - s.cfg.pushBack)
 
   const p = enemyPos(e, ctx, s.time)
   const w = e.w || 90
@@ -198,7 +195,7 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
 function miss(s: InkState, ctx: ModeContext, e: Enemy | null) {
   const { juice } = ctx
   s.errors++
-  breakCombo(s, false)
+  breakCombo(s, comboAfterMiss(s.combo, ctx.tier))
   s.errorFlash++
   juice.audio.thud()
   juice.trauma(0.1)
@@ -219,7 +216,7 @@ function breach(s: InkState, e: Enemy, ctx: ModeContext) {
   s.lives = Math.max(0, s.lives - (e.heavy ? 2 : 1))
   s.damagedThisWave = true
   s.lifeLost++
-  breakCombo(s, true)
+  breakCombo(s, 0)
   juice.audio.blot()
   juice.trauma(0.6)
   juice.splatter(p.x, y, { color: c.error, count: 26, power: 440, angle: -Math.PI / 2, spread: 1.2 })

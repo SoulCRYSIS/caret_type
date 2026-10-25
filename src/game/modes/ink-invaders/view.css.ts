@@ -216,7 +216,8 @@ export const mult = style({
     '&[data-tier="2"]': { color: vars.color.ink },
     '&[data-tier="3"]': { color: vars.color.accent },
     '&[data-tier="4"]': { color: vars.color.accent, textShadow: `2px 2px 0 ${tone.accentWash}` },
-    '&[data-tier="5"]': { color: vars.color.accent, fontSize: 40, textShadow: `3px 3px 0 ${tone.accentWash}, -1px -1px 0 ${tone.accentWash}` },
+    '&[data-tier="5"]': { color: vars.color.accent, fontSize: 38, textShadow: `3px 3px 0 ${tone.accentWash}` },
+    '&[data-tier="6"]': { color: vars.color.accent, fontSize: 42, textShadow: `3px 3px 0 ${tone.accentWash}, -1px -1px 0 ${tone.accentWash}` },
   },
 })
 

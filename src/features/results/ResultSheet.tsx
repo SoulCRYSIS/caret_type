@@ -20,6 +20,7 @@ function BoardLine({ status }: { status: BoardStatus | null }) {
   if (status.kind === 'offline') return <p className={css.boardNote}>saved on this device</p>
   if (status.kind === 'error') return <p className={css.boardNote}>couldn't reach the standings — the run is kept and will be posted next time you sign in</p>
   if (status.kind === 'guest') return null
+  if (status.kind === 'unverified') return <p className={css.boardNote}>kept on this device — confirm your email and it goes up on the standings</p>
   const { improved, rankAllTime } = status.result
   const anyBetter = Object.values(improved).some(Boolean)
   return (
@@ -110,6 +111,7 @@ export function ResultSheet({ run, details, mode, recorded }: { run: RunResult; 
   const streak = useProgress((s) => s.streak)
   const user = useAuth((s) => s.user)
   const syncing = useAuth((s) => s.syncing)
+  const verified = useAuth((s) => s.unverifiedEmail === null)
   const [board, setBoard] = useState<BoardStatus | null>(null)
   const [claimed, setClaimed] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -123,8 +125,8 @@ export function ResultSheet({ run, details, mode, recorded }: { run: RunResult; 
     }
   }, [recorded])
 
-  // A guest who signs in from this sheet: the sign-in sync uploads the run, then we report where it landed.
-  const waitingForClaim = board?.kind === 'guest' && !!user && !syncing
+  // A guest who signs in (or confirms their email) from this sheet: the sync uploads the run, then we report where it landed.
+  const waitingForClaim = (board?.kind === 'guest' || (board?.kind === 'unverified' && verified)) && !!user && !syncing
   useEffect(() => {
     if (!waitingForClaim) return
     let alive = true

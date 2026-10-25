@@ -109,7 +109,7 @@ export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
           <span className={css.tierBar} aria-hidden>
             <span className={css.tierFill} style={{ transform: `scaleX(${tierProgress(s.combo)})` }} />
           </span>
-          <span className={css.comboCount}>{mult >= 5 ? `${s.combo} · max` : `${s.combo} / ${COMBO_TIERS[mult]}`}</span>
+          <span className={css.comboCount}>{mult >= COMBO_TIERS.length ? `${s.combo} · max` : `${s.combo} / ${COMBO_TIERS[mult]}`}</span>
           {s.comboBreak && (
             <span key={s.comboBreak.id} className={css.crackNum}>
               {s.comboBreak.value}

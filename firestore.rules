@@ -6,6 +6,7 @@ rules_version = '2';
 //
 // users/{uid}                         private to the owner
 //   displayName: string|null (<= 100)
+//   named:       bool (the player picked their own display name)
 //   photoURL:    string|null (https, <= 2048)
 //   settings:    map (synced preferences, fixed keys)
 //   streak:      map { current, longest, freezes: int; lastPlayedDay: 'YYYY-MM-DD'|null }
@@ -39,6 +40,12 @@ service cloud.firestore {
 
     function isOwner(uid) {
       return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Email/password accounts must confirm their address before posting runs.
+    function canPost() {
+      return request.auth.token.firebase.sign_in_provider != 'password'
+        || request.auth.token.email_verified == true;
     }
 
     function isInt(v, lo, hi) {
@@ -82,7 +89,7 @@ service cloud.firestore {
         && isNum(d.wpm, 0, 300)
         && isNum(d.accuracy, 0, 1)
         && isNum(d.durationMs, 0, 21600000)
-        && d.score <= d.chars * 100 + 100 * d.wave * (d.wave + 1)
+        && d.score <= d.chars * 120 + 100 * d.wave * (d.wave + 1)
         && d.wpm * d.durationMs <= d.chars * 12600 + 60000;
     }
 
@@ -129,8 +136,9 @@ service cloud.firestore {
     }
 
     function isValidUser(d) {
-      return d.keys().hasOnly(['displayName', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt'])
+      return d.keys().hasOnly(['displayName', 'named', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt'])
         && (!('displayName' in d) || isOptionalString(d.displayName, 100))
+        && (!('named' in d) || d.named is bool)
         && (!('photoURL' in d) || isOptionalUrl(d.photoURL))
         && (!('settings' in d) || isValidSettings(d.settings))
         && (!('streak' in d) || isValidStreak(d.streak))
@@ -187,17 +195,22 @@ service cloud.firestore {
 
       match /runs/{runId} {
         allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && isValidRun(request.resource.data);
+        allow create: if isOwner(uid) && canPost() && isValidRun(request.resource.data);
         allow update, delete: if false;
       }
     }
 
     match /leaderboards/{boardId}/entries/{uid} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(uid) && isValidEntry(request.resource.data, boardId, uid);
-      allow update: if isOwner(uid)
-        && isValidEntry(request.resource.data, boardId, uid)
-        && request.resource.data.score > resource.data.score;
+      allow create: if isOwner(uid) && canPost() && isValidEntry(request.resource.data, boardId, uid);
+      // Either a better run, or a rename that touches nothing else.
+      allow update: if isOwner(uid) && (
+        (canPost() && isValidEntry(request.resource.data, boardId, uid)
+          && request.resource.data.score > resource.data.score)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 60));
       allow delete: if false;
     }
   }

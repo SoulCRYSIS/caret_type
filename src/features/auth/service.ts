@@ -1,10 +1,13 @@
 import {
   FacebookAuthProvider,
+  GithubAuthProvider,
   GoogleAuthProvider,
   OAuthProvider,
   createUserWithEmailAndPassword,
   getRedirectResult,
   onAuthStateChanged,
+  reload,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -18,7 +21,9 @@ import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestam
 import { auth, db } from '../../lib/firebase'
 import type { RunResult } from '../../game/modes/types'
 import { fetchOwnEntry, submitRun, type BoardUser, type SubmitResult } from '../leaderboard/api'
-import { boardId } from '../leaderboard/periods'
+import { MODES } from '../../game/modes/registry'
+import { LANGUAGES, TIERS } from '../../game/words/languages'
+import { boardId, PERIODS } from '../leaderboard/periods'
 import { mergeStats, useProgress, type Stats } from '../progress/progressStore'
 import { pickSettings, type Settings } from '../settings/settingsStore'
 import { mergeStreak, type StreakState } from '../streak/streak'
@@ -27,6 +32,8 @@ import type { ProviderId } from './providers'
 export interface RemoteUserDoc {
   displayName: string | null
   photoURL: string | null
+  /** Set once the player has picked their own name. */
+  named?: boolean
   settings?: Settings
   streak?: StreakState
   stats?: Stats
@@ -37,6 +44,11 @@ function createProvider(id: ProviderId): AuthProvider {
     case 'google': {
       const p = new GoogleAuthProvider()
       p.setCustomParameters({ prompt: 'select_account' })
+      return p
+    }
+    case 'github': {
+      const p = new GithubAuthProvider()
+      p.addScope('read:user')
       return p
     }
     case 'microsoft': {
@@ -76,11 +88,32 @@ export async function emailSignIn(email: string, password: string): Promise<void
   await signInWithEmailAndPassword(auth, email, password)
 }
 
-/** Creates the account and sets its display name before resolving. */
-export async function emailSignUp(name: string, email: string, password: string): Promise<User> {
+export async function emailSignUp(email: string, password: string): Promise<void> {
   const { user } = await createUserWithEmailAndPassword(auth, email, password)
-  await updateProfile(user, { displayName: name })
-  return user
+  await sendVerification(user).catch((err) => console.error(err))
+}
+
+/** Password accounts must confirm their address; OAuth providers vouch for theirs. */
+export function isVerified(user: User): boolean {
+  return user.emailVerified || !user.providerData.some((p) => p.providerId === 'password')
+}
+
+export async function sendVerification(user: User): Promise<void> {
+  try {
+    await sendEmailVerification(user, { url: window.location.origin })
+  } catch (err) {
+    // The return link only works on authorised domains; without it the email still verifies.
+    if ((err as { code?: string }).code !== 'auth/unauthorized-continue-uri') throw err
+    await sendEmailVerification(user)
+  }
+}
+
+/** Reloads the account and, once verified, refreshes the token so the security rules see it. */
+export async function refreshVerified(user: User): Promise<boolean> {
+  await reload(user)
+  if (!isVerified(user)) return false
+  await user.getIdToken(true)
+  return true
 }
 
 export function emailReset(email: string): Promise<void> {
@@ -99,10 +132,11 @@ export function toBoardUser(u: User): BoardUser {
 
 /**
  * Reconcile local progress with the account. Guest progress is merged in
- * (higher streak wins, stats add up) and unsynced guest runs are uploaded.
- * Returns remote settings if the account already had some.
+ * (higher streak wins, stats add up) and unsynced guest runs are uploaded,
+ * unless the account's email isn't confirmed yet, in which case they wait on this device.
+ * Returns remote settings if the account already had some, and whether the player has chosen a name yet.
  */
-export async function syncOnSignIn(user: User, localSettings: Settings): Promise<Settings | null> {
+export async function syncOnSignIn(user: User, localSettings: Settings): Promise<{ settings: Settings | null; named: boolean }> {
   const progress = useProgress.getState()
   if (progress.ownerUid && progress.ownerUid !== user.uid) progress.reset()
   const local = useProgress.getState()
@@ -129,7 +163,8 @@ export async function syncOnSignIn(user: User, localSettings: Settings): Promise
     { merge: true },
   )
 
-  const pending = local.unsynced
+  const verified = isVerified(user)
+  const pending = verified ? local.unsynced : []
   if (pending.length > 0) {
     const batch = writeBatch(db)
     for (const run of pending) batch.set(doc(collection(userRef(user.uid), 'runs')), { ...run, createdAt: serverTimestamp() })
@@ -143,8 +178,21 @@ export async function syncOnSignIn(user: User, localSettings: Settings): Promise
   }
 
   useProgress.getState().adopt(user.uid, streak, stats)
-  useProgress.getState().clearUnsynced()
-  return settings
+  if (verified) useProgress.getState().clearUnsynced()
+  return { settings, named: remote?.named === true }
+}
+
+/** Renames the account everywhere it shows, including this period's standings. Past days and weeks keep the old name. */
+export async function setDisplayName(user: User, name: string): Promise<void> {
+  await updateProfile(user, { displayName: name })
+  await setDoc(userRef(user.uid), { displayName: name, named: true, updatedAt: serverTimestamp() }, { merge: true })
+  const refs = MODES.flatMap((m) =>
+    LANGUAGES.flatMap((l) => TIERS.flatMap((t) => PERIODS.map((p) => doc(db, 'leaderboards', boardId(m.id, l.id, t.id, p.id), 'entries', user.uid)))),
+  )
+  const snaps = await Promise.all(refs.map((ref) => getDoc(ref)))
+  const batch = writeBatch(db)
+  for (const snap of snaps) if (snap.exists()) batch.update(snap.ref, { name: name.slice(0, 60) })
+  await batch.commit()
 }
 
 export async function saveRun(user: User, run: RunResult): Promise<SubmitResult> {

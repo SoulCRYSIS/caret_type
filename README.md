@@ -3,7 +3,7 @@
 A minimalist, gamified typing game. Words drift down the page as ink-stamped enemies; type them to blot them out.
 
 - React 19 + TypeScript, Vite, Radix Primitives, Vanilla Extract, Zustand
-- Firebase Auth (Google, Microsoft, Facebook, email/password) and Firestore for accounts, synced progress and standings
+- Firebase Auth (Google, GitHub, Microsoft, Facebook, email/password) and Firestore for accounts, synced progress and standings
 - Plays fully offline as a guest when Firebase isn't configured
 
 ## Run it
@@ -29,7 +29,7 @@ To set up a different project from scratch:
 
 1. Create a project in the [Firebase console](https://console.firebase.google.com) and add a **Web app**.
 2. Copy `.env.example` to `.env.local` and fill in the `VITE_FIREBASE_*` values from the web app config.
-3. **Authentication → Sign-in method**: enable the providers the app offers — **Google**, **Email/Password**, **Microsoft** and **Facebook**. Microsoft needs an Azure app registration (client ID + secret) and Facebook a Meta developer app (app ID + secret); both take `https://<project>.firebaseapp.com/__/auth/handler` as the OAuth redirect URI. A provider that isn't enabled shows "this sign-in method isn't switched on yet" instead of failing silently.
+3. **Authentication → Sign-in method**: enable the providers the app offers — **Google**, **GitHub**, **Email/Password**, **Microsoft** and **Facebook**. GitHub needs an OAuth app (GitHub → Settings → Developer settings → OAuth Apps; client ID + secret), Microsoft needs an Azure app registration (client ID + secret) and Facebook a Meta developer app (app ID + secret); all three take `https://<project>.firebaseapp.com/__/auth/handler` as the OAuth redirect URI. A provider that isn't enabled shows "this sign-in method isn't switched on yet" instead of failing silently.
 4. **Authentication → Settings → Authorized domains**: add every domain you'll serve from (`localhost` is there by default; add your `*.web.app` / custom domain before going live).
 5. **Firestore Database**: create a database (production mode). Rules live in `firestore.rules`.
 6. Put your project id in `.firebaserc` (replace `your-firebase-project-id`).

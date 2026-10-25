@@ -18,6 +18,10 @@ interface AuthStore {
   user: AuthUser | null
   syncing: boolean
   error: string | null
+  /** A new account that hasn't picked the name it shows on the standings. */
+  needsName: boolean
+  /** Email of a password account whose address isn't confirmed yet; its runs stay on this device until it is. */
+  unverifiedEmail: string | null
 }
 
 export const useAuth = create<AuthStore>(() => ({
@@ -25,12 +29,15 @@ export const useAuth = create<AuthStore>(() => ({
   user: null,
   syncing: false,
   error: null,
+  needsName: false,
+  unverifiedEmail: null,
 }))
+
+export const NAME_MAX = 40
 
 type Service = typeof import('./service')
 let servicePromise: Promise<Service> | null = null
 let firebaseUser: User | null = null
-let signUpPending: Promise<unknown> | null = null
 
 export function loadService(): Promise<Service> {
   servicePromise ??= import('./service')
@@ -71,31 +78,63 @@ export function initAuth(): void {
         firebaseUser = u
         if (!u) {
           stopSettingsSync?.()
-          useAuth.setState({ status: 'guest', user: null, syncing: false })
+          useAuth.setState({ status: 'guest', user: null, syncing: false, needsName: false, unverifiedEmail: null })
           return
         }
-        // A brand-new email account signs in before its display name is set; wait so the name reaches the standings.
-        if (signUpPending) await signUpPending.catch(() => null)
-        useAuth.setState({ status: 'user', user: { uid: u.uid, displayName: u.displayName, photoURL: u.photoURL }, syncing: true, error: null })
-        try {
-          const remote = await svc.syncOnSignIn(u, useSettings.getState())
-          if (remote) {
-            applyingRemote = true
-            useSettings.getState().set(remote)
-            applyingRemote = false
-          }
-          startSettingsSync(u.uid)
-          useAuth.setState({ syncing: false })
-        } catch (err) {
-          console.error(err)
-          useAuth.setState({ syncing: false, error: 'Could not sync your progress. It is kept on this device.' })
-        }
+        useAuth.setState({
+          status: 'user',
+          user: { uid: u.uid, displayName: u.displayName, photoURL: u.photoURL },
+          unverifiedEmail: svc.isVerified(u) ? null : u.email,
+          syncing: true,
+          error: null,
+        })
+        await sync(svc, u)
       }),
     )
     .catch((err) => {
       console.error(err)
       useAuth.setState({ status: 'guest', error: 'Sign-in is unavailable right now.' })
     })
+}
+
+async function sync(svc: Service, u: User) {
+  useAuth.setState({ syncing: true })
+  try {
+    const { settings, named } = await svc.syncOnSignIn(u, useSettings.getState())
+    if (settings) {
+      applyingRemote = true
+      useSettings.getState().set(settings)
+      applyingRemote = false
+    }
+    startSettingsSync(u.uid)
+    useAuth.setState({ syncing: false, needsName: !named })
+  } catch (err) {
+    console.error(err)
+    useAuth.setState({ syncing: false, error: 'Could not sync your progress. It is kept on this device.' })
+  }
+}
+
+/** Re-reads the account; once the email link has been clicked, posts the runs that were held back. */
+export async function checkVerified(): Promise<boolean> {
+  const u = firebaseUser
+  if (!u || useAuth.getState().unverifiedEmail === null) return true
+  const svc = await loadService()
+  if (!(await svc.refreshVerified(u))) return false
+  useAuth.setState({ unverifiedEmail: null })
+  await sync(svc, u)
+  return true
+}
+
+export async function resendVerification(): Promise<string | null> {
+  const u = firebaseUser
+  if (!u) return 'Sign in first.'
+  try {
+    const svc = await loadService()
+    await svc.sendVerification(u)
+    return null
+  } catch (err) {
+    return authError(err, "Couldn't send the email. Please try again.")
+  }
 }
 
 const AUTH_ERRORS: Record<string, string> = {
@@ -147,19 +186,34 @@ export async function signInWithEmail(email: string, password: string): Promise<
   }
 }
 
-export async function signUpWithEmail(name: string, email: string, password: string): Promise<boolean> {
+export async function signUpWithEmail(email: string, password: string): Promise<boolean> {
   useAuth.setState({ error: null })
-  const displayName = name.trim() || email.trim().split('@')[0]
   try {
     const svc = await loadService()
-    signUpPending = svc.emailSignUp(displayName, email.trim(), password)
-    await signUpPending
+    await svc.emailSignUp(email.trim(), password)
     return true
   } catch (err) {
     useAuth.setState({ error: authError(err, "Couldn't create the account. Please try again.") })
     return false
-  } finally {
-    signUpPending = null
+  }
+}
+
+/** Returns an error message, or null once the new name is saved. */
+export async function changeName(raw: string): Promise<string | null> {
+  const name = raw.trim().replace(/\s+/g, ' ')
+  if (!name) return 'Pick a name to show on the standings.'
+  if (name.length > NAME_MAX) return `Keep it under ${NAME_MAX} characters.`
+  const u = firebaseUser
+  const user = useAuth.getState().user
+  if (!u || !user) return 'Sign in first.'
+  try {
+    const svc = await loadService()
+    await svc.setDisplayName(u, name)
+    useAuth.setState({ user: { ...user, displayName: name }, needsName: false })
+    return null
+  } catch (err) {
+    console.error(err)
+    return authError(err, "Couldn't save your name. Please try again.")
   }
 }
 
@@ -179,6 +233,7 @@ export async function signOut(): Promise<void> {
   const svc = await loadService()
   await svc.signOutUser()
   useProgress.getState().reset()
+  useAuth.setState({ needsName: false })
 }
 
 export function currentFirebaseUser(): User | null {

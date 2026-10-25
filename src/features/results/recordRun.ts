@@ -7,6 +7,7 @@ export type BoardStatus =
   | { kind: 'guest' }
   | { kind: 'offline' }
   | { kind: 'pending' }
+  | { kind: 'unverified' }
   | { kind: 'done'; result: SubmitResult }
   | { kind: 'error' }
 
@@ -17,13 +18,16 @@ export interface Recorded extends RecordOutcome {
 /** Store the run locally, then (if signed in) persist it and post it to the leaderboards. */
 export function recordRun(run: RunResult): Recorded {
   const outcome = useProgress.getState().record(run)
-  const { status } = useAuth.getState()
+  const { status, unverifiedEmail } = useAuth.getState()
   const user = currentFirebaseUser()
 
   let board: Promise<BoardStatus>
   if (status === 'unavailable') board = Promise.resolve({ kind: 'offline' })
   else if (!user) board = Promise.resolve({ kind: 'guest' })
-  else
+  else if (unverifiedEmail !== null) {
+    useProgress.getState().queue(run)
+    board = Promise.resolve({ kind: 'unverified' })
+  } else
     board = loadService()
       .then((svc) => svc.saveRun(user, run))
       .then((result): BoardStatus => ({ kind: 'done', result }))
@@ -43,6 +47,7 @@ export function recordRun(run: RunResult): Recorded {
 export async function claimBoard(run: RunResult): Promise<BoardStatus> {
   const user = currentFirebaseUser()
   if (!user) return { kind: 'guest' }
+  if (useAuth.getState().unverifiedEmail !== null) return { kind: 'unverified' }
   if (useProgress.getState().unsynced.some((r) => r.startedAt === run.startedAt)) return { kind: 'error' }
   try {
     const svc = await loadService()

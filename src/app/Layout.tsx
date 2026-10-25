@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
-import { AccountMenu } from '../features/auth/AuthControls'
+import { AccountMenu, NamePrompt, VerifyNotice } from '../features/auth/AuthControls'
 import { PalettePicker } from '../features/settings/PalettePicker'
 import { useSettings } from '../features/settings/settingsStore'
 import { StreakMark } from '../features/streak/StreakMark'
@@ -75,7 +75,9 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
       </header>
 
+      {!hidden && <VerifyNotice />}
       <main className={css.main}>{children}</main>
+      <NamePrompt />
 
       <footer className={css.footer} data-hidden={hidden} data-solid={solid}>
         <div className={css.hints} data-hidden={onPlay && phase === 'over'}>
