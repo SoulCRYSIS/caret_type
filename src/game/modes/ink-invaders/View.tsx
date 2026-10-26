@@ -72,20 +72,22 @@ function BannerView({ banner }: { banner: Banner }) {
 
 const SEAL_FACE = `italic 600 64px ${FONT_DISPLAY.split(',')[0].trim()}`
 
-/** Higher tiers get a longer, finer stroke and a cleaner, more framed seal. */
+/** Higher tiers get a longer stroke, a larger numeral, and a wetter splash. */
 function tierLook(mult: number) {
   const t = Math.min(10, Math.max(1, mult))
   return {
     corner: 52 + (t - 1) * 4,
-    hero: 86 + Math.max(0, t - 2) * 4,
+    hero: 78 + (t - 1) * 11,
     reach: 0.15 + t * 0.02,
     weight: 40 - t * 1.6,
     rings: t >= 8 ? 2 : t >= 4 ? 1 : 0,
     grain: t >= 9 ? 0.32 : t >= 6 ? 0.55 : t >= 4 ? 0.78 : 1,
     tilt: -0.16 + (t - 1) * 0.014,
-    drops: t >= 8 ? 4 : t >= 5 ? 3 : 2,
+    drops: 4 + t * 2,
+    spread: 16 + t * 11,
     companion: t >= 5,
     flick: t >= 8,
+    sprays: Math.max(0, t - 3),
   }
 }
 
@@ -116,19 +118,24 @@ function paintBrush(canvas: HTMLCanvasElement, mult: number) {
   if (look.flick) {
     brushStroke(g, x1 - w * 0.16, y + 18, x1 + w * 0.04, y + 30, look.weight * 0.28, ink, seeded(mult * 41 + 7), 1)
   }
-  const drops = [
-    [28, -14, 4.2],
-    [48, 12, 3],
-    [18, 22, 3.4],
-    [66, -2, 2.1],
-  ]
-  const fine = 1.2 - mult * 0.05
+  for (let i = 0; i < look.sprays; i++) {
+    const flick = seeded(mult * 53 + i * 9)
+    const ang = -1.1 + flick() * 2.1
+    const len = 22 + flick() * (16 + mult * 9)
+    const ox = x0 + (x1 - x0) * (0.45 + flick() * 0.5)
+    const oy = y + (flick() - 0.5) * 18
+    brushStroke(g, ox, oy, ox + Math.cos(ang) * len, oy + Math.sin(ang) * len * 0.65, look.weight * (0.16 + flick() * 0.2), ink, flick, 1)
+  }
+  const rand = seeded(mult * 13 + 9)
   g.fillStyle = ink
   for (let i = 0; i < look.drops; i++) {
-    const [dx, dy, rad] = drops[i]
-    g.globalAlpha = 0.75
+    const along = 0.35 + rand() * 0.7
+    const side = (rand() - 0.5) * look.spread * (0.45 + rand())
+    const rad = 1.6 + rand() * (2.4 + mult * 0.7)
+    const fat = i % 4 === 0 ? rad * 1.7 : rad
+    g.globalAlpha = 0.4 + rand() * 0.5
     g.beginPath()
-    g.ellipse(x1 + dx, y + 10 + dy, rad * fine, rad * fine * 0.7, 0.4, 0, Math.PI * 2)
+    g.ellipse(x0 + (x1 - x0) * along + side * 0.35, y + side * 0.85, fat, fat * (0.5 + rand() * 0.35), rand() * Math.PI, 0, Math.PI * 2)
     g.fill()
   }
   g.globalAlpha = 1

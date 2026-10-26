@@ -333,23 +333,23 @@ export const notebookRule = style({
 
 const brushFade = keyframes({
   '0%': { opacity: 1, clipPath: 'inset(0 100% 0 0)' },
-  '46%': { opacity: 1, clipPath: 'inset(0 0 0 0)' },
-  '62%': { opacity: 1, clipPath: 'inset(0 0 0 0)' },
+  '28%': { opacity: 1, clipPath: 'inset(0 0 0 0)' },
+  '74%': { opacity: 1, clipPath: 'inset(0 0 0 0)' },
   '100%': { opacity: 0, clipPath: 'inset(0 0 0 0)' },
 })
 
 const sealIn = keyframes({
   '0%': { opacity: 0, transform: 'translate(-50%, -50%) scale(1.35) rotate(-12deg)' },
-  '34%': { opacity: 1, transform: 'translate(-50%, -50%) scale(0.94) rotate(-2deg)' },
-  '50%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
-  '68%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
+  '22%': { opacity: 1, transform: 'translate(-50%, -50%) scale(0.94) rotate(-2deg)' },
+  '32%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
+  '74%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
   '100%': { opacity: 0, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
 })
 
 const sealStill = keyframes({
   '0%': { opacity: 0, transform: 'translate(-50%, -50%)' },
-  '20%': { opacity: 1, transform: 'translate(-50%, -50%)' },
-  '55%': { opacity: 1, transform: 'translate(-50%, -50%)' },
+  '16%': { opacity: 1, transform: 'translate(-50%, -50%)' },
+  '70%': { opacity: 1, transform: 'translate(-50%, -50%)' },
   '100%': { opacity: 0, transform: 'translate(-50%, -50%)' },
 })
 
@@ -361,7 +361,7 @@ export const brushField = style({
   zIndex: 1,
   pointerEvents: 'none',
   color: vars.color.ink,
-  animation: `${brushFade} .48s linear both`,
+  animation: `${brushFade} .72s linear both`,
 })
 
 export const sealStamp = style({
@@ -370,10 +370,10 @@ export const sealStamp = style({
   top: '44%',
   zIndex: 4,
   pointerEvents: 'none',
-  animation: `${sealIn} .48s linear both`,
-  selectors: { '&[data-reduced="true"]': { animation: `${sealStill} .32s ease-out both` } },
+  animation: `${sealIn} .72s linear both`,
+  selectors: { '&[data-reduced="true"]': { animation: `${sealStill} .52s ease-out both` } },
   '@media': {
-    '(prefers-reduced-motion: reduce)': { animation: `${sealStill} .32s ease-out both` },
+    '(prefers-reduced-motion: reduce)': { animation: `${sealStill} .52s ease-out both` },
     '(max-width: 720px)': { scale: '0.72' },
   },
 })
