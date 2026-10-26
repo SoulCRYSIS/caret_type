@@ -39,9 +39,9 @@ export const DEFAULT_SETTINGS: Settings = {
   paletteId: 'paper',
   customPalette: DEFAULT_CUSTOM,
   sound: true,
-  volume: 0.6,
+  volume: 0.5,
   music: true,
-  musicVolume: 0.5,
+  musicVolume: 0.3,
   shake: true,
   particles: true,
 }
