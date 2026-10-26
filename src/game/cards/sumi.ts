@@ -193,6 +193,10 @@ export interface HankoSpec {
   angle?: number
   /** Carve the characters out of a filled block (shubun) instead of raising them (hakubun-style outline). */
   filled?: boolean
+  /** Inner frames carved inside the square. 0 is a plain seal. */
+  rings?: number
+  /** 0 is a clean stone, 1 is the usual worn seal. */
+  grain?: number
 }
 
 /** A red name seal: square, rough-edged, unevenly inked. */
@@ -236,9 +240,23 @@ export function hanko(g: CanvasRenderingContext2D, cx: number, cy: number, spec:
     s.fillText(line, x0 + size / 2, x0 + size / 2 + (i - (rows - 1) / 2) * rowH + px * 0.06)
   })
 
+  const rings = spec.rings ?? 0
+  if (rings > 0) {
+    s.globalCompositeOperation = 'destination-out'
+    s.globalAlpha = 1
+    s.lineWidth = Math.max(1, size * 0.02)
+    for (let i = 0; i < rings; i++) {
+      const inset = size * (0.055 + i * 0.05)
+      s.beginPath()
+      s.roundRect(x0 + inset, x0 + inset, size - inset * 2, size - inset * 2, corner * 0.55)
+      s.stroke()
+    }
+  }
+
   // worn stone: erode edges and speckle the ink
+  const grain = spec.grain ?? 1
   s.globalCompositeOperation = 'destination-out'
-  for (let i = 0; i < size * 1.6; i++) {
+  for (let i = 0; i < size * 1.6 * grain; i++) {
     const side = Math.floor(rand() * 4)
     const t = rand() * size
     const px = side === 0 ? x0 + t : side === 1 ? x0 + size : side === 2 ? x0 + t : x0
@@ -248,7 +266,7 @@ export function hanko(g: CanvasRenderingContext2D, cx: number, cy: number, spec:
     s.arc(px, py, 0.5 + rand() * size * 0.025, 0, Math.PI * 2)
     s.fill()
   }
-  for (let i = 0; i < size * size * 0.012; i++) {
+  for (let i = 0; i < size * size * 0.012 * grain; i++) {
     s.globalAlpha = 0.15 + rand() * 0.6
     s.beginPath()
     s.arc(x0 + rand() * size, x0 + rand() * size, 0.4 + rand() * 1.4, 0, Math.PI * 2)

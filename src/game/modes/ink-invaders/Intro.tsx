@@ -78,7 +78,7 @@ export function InkIntro({ ready, error }: IntroProps) {
         <span className={css.caret} aria-hidden />
       </h1>
       <p className={css.blurb}>
-        Words drift toward the margin like falling ink. Type each one before it spills. Combo climbs to ×10; a mistype costs a bite of it (bigger on harder tiers), a spill costs it all.
+        Words drift toward the margin like falling ink. Type each one before it spills. Combo climbs to ×10; a mistype costs a bite of it, and harder tiers take a bigger bite.
       </p>
       {(error || !ready) && <div className={css.hints}>{error ? "couldn't load the word list — check your connection" : 'grinding the ink…'}</div>}
     </div>

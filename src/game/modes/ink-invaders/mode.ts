@@ -119,7 +119,7 @@ function removeEnemy(s: InkState, e: Enemy) {
   s.waveDone++
 }
 
-/** A mistype chips the combo; a breach clears it. */
+/** A mistype chips the combo. Spilling an ink costs a life and leaves the combo where it is. */
 function breakCombo(s: InkState, next: number) {
   const lost = s.combo - next
   if (lost >= 5) s.comboBreak = { id: ++s.fxId, value: -lost }
@@ -168,15 +168,13 @@ function kill(s: InkState, e: Enemy, ctx: ModeContext) {
   }
 }
 
-/** A tier-up throws a sheet of ink across the middle of the page. */
-function splashCombo(ctx: ModeContext, mult: number, ink: string, accent: string) {
+/** A tier-up flicks a little sumi off the brush, along the stroke. */
+function splashCombo(ctx: ModeContext, mult: number, ink: string) {
   const { juice } = ctx
-  const x = ctx.width / 2
-  const y = ctx.height * 0.44
-  const color = mult >= 4 ? accent : ink
-  juice.splatter(x, y, { color, count: 22 + mult * 7, power: 520 + mult * 60, stains: false, size: 1.8, linger: 1.3 })
-  juice.splatter(x, y, { color: ink, count: 8 + mult * 2, power: 240 + mult * 28, stains: false, size: 2.8, linger: 1.15 })
-  juice.splatter(x, y, { color, count: 6 + mult, power: 150 + mult * 12, angle: Math.PI / 2, spread: 1.05, stains: false, size: 3.3, linger: 1.35 })
+  const x = ctx.width * 0.34
+  const y = ctx.height * 0.46
+  juice.splatter(x, y, { color: ink, count: 5 + mult, power: 200 + mult * 16, angle: 0.08, spread: 0.4, stains: false, size: 1.25, linger: 1 })
+  if (mult >= 6) juice.splatter(ctx.width * 0.72, y + 14, { color: ink, count: 4, power: 130, angle: 0.35, spread: 0.3, stains: false, size: 1, linger: 0.85 })
 }
 
 function hit(s: InkState, e: Enemy, ctx: ModeContext) {
@@ -210,7 +208,7 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
     // A new tier lands with a shockwave from the word, bigger every time.
     const burst = comboPower(after)
     juice.splatter(p.x + w / 2, p.y + (e.h || 40) / 2, { color: c.accent, count: 10 + burst.level * 8, power: 260 + burst.level * 50, stains: false })
-    splashCombo(ctx, after, c.ink, c.accent)
+    splashCombo(ctx, after, c.ink)
     const rings = Math.min(after >= 7 ? 6 : 4, burst.level)
     for (let i = 0; i < rings; i++) juice.particles.ring(p.x + w / 2, p.y + (e.h || 40) / 2, i % 2 ? c.ink : c.accent, 90 + i * 55, 3)
     if (after >= 4) {
@@ -247,7 +245,6 @@ function breach(s: InkState, e: Enemy, ctx: ModeContext) {
   s.lives = Math.max(0, s.lives - (e.heavy ? 2 : 1))
   s.damagedThisWave = true
   s.lifeLost++
-  breakCombo(s, 0)
   juice.audio.blot()
   juice.trauma(0.6)
   juice.splatter(p.x, y, { color: c.error, count: 26, power: 440, angle: -Math.PI / 2, spread: 1.2 })
