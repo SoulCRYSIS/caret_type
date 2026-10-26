@@ -24,6 +24,15 @@ export const header = style([
     top: 0,
     height: 64,
     selectors: { '&[data-hidden="true"]': { transform: 'translateY(-6px)' } },
+    '@media': {
+      'screen and (max-width: 640px)': {
+        height: 'auto',
+        flexWrap: 'wrap',
+        alignItems: 'flex-start',
+        rowGap: 8,
+        padding: '12px 16px 10px',
+      },
+    },
   },
 ])
 
@@ -72,6 +81,13 @@ export const nav = style({
   display: 'flex',
   alignItems: 'center',
   gap: 22,
+  '@media': {
+    'screen and (max-width: 640px)': {
+      flexBasis: '100%',
+      flexWrap: 'wrap',
+      gap: '8px 16px',
+    },
+  },
 })
 
 export const sep = style({

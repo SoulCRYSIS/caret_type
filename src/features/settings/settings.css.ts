@@ -82,6 +82,7 @@ export const page = style({
   maxWidth: 760,
   margin: '0 auto',
   padding: '110px 24px 120px',
+  '@media': { 'screen and (max-width: 640px)': { paddingTop: 156 } },
 })
 
 export const heading = style({

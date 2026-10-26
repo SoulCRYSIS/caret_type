@@ -12,6 +12,7 @@ import PlayPage from './PlayPage'
 const LeaderboardPage = lazy(() => import('../features/leaderboard/LeaderboardPage'))
 const ProfilePage = lazy(() => import('../features/profile/ProfilePage'))
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage'))
+const AboutPage = lazy(() => import('../features/about/AboutPage'))
 
 function useBoot() {
   usePaletteSync()
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<PlayPage />} />
             </Routes>
           </Suspense>

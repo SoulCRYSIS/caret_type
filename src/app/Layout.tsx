@@ -72,6 +72,9 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/settings" className={ui.button.link}>
             settings
           </NavLink>
+          <NavLink to="/about" className={ui.button.link}>
+            about
+          </NavLink>
           <AccountMenu />
         </nav>
       </header>

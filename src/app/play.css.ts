@@ -40,6 +40,7 @@ export const overlay = style({
   placeItems: 'center',
   padding: '96px 24px 80px',
   overflowY: 'auto',
+  '@media': { 'screen and (max-width: 640px)': { paddingTop: 148 } },
 })
 
 /* --- config bar: a fill-in-the-blanks sentence --- */
@@ -47,6 +48,7 @@ export const overlay = style({
 export const config = style({
   position: 'absolute',
   top: 84,
+  '@media': { 'screen and (max-width: 640px)': { top: 148 } },
   left: 0,
   right: 0,
   zIndex: 25,
