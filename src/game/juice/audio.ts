@@ -134,6 +134,20 @@ export class Synth {
     this.noiseBurst(ctx, 'highpass', 700, 0.6, this.env(ctx, 0.35, 0.001, 0.06), t, 0.08)
   }
 
+  /** Low thump under a kill; `power` (0..1) deepens and loudens it. */
+  thump(power: number): void {
+    const ctx = this.ready()
+    if (!ctx || power <= 0) return
+    const t = ctx.currentTime
+    const o = ctx.createOscillator()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(150 - power * 40, t)
+    o.frequency.exponentialRampToValueAtTime(36, t + 0.2)
+    o.connect(this.env(ctx, 0.25 + power * 0.55, 0.002, 0.14 + power * 0.14))
+    o.start(t)
+    o.stop(t + 0.35)
+  }
+
   /** Typewriter carriage bell. */
   bell(): void {
     const ctx = this.ready()
@@ -169,6 +183,93 @@ export class Synth {
     o.start(t)
     o.stop(t + 0.5)
     this.noiseBurst(ctx, 'lowpass', 800, 1, this.env(ctx, 0.4, 0.004, 0.3), t, 0.4)
+  }
+
+  /** One brass-like stab: detuned saws through a filter that opens on the attack and closes again. */
+  private stab(ctx: AudioContext, at: number, freq: number, len: number, peak: number, open: number): void {
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.Q.value = 3
+    lp.frequency.setValueAtTime(180, at)
+    lp.frequency.exponentialRampToValueAtTime(open, at + 0.07)
+    lp.frequency.exponentialRampToValueAtTime(260, at + len)
+    lp.connect(this.env(ctx, peak, 0.025, len, at))
+    for (const [ratio, cents] of [
+      [1, -9],
+      [1, 8],
+      [1.5, 0],
+      [2, 5],
+    ] as const) {
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.frequency.value = freq * ratio
+      o.detune.value = cents
+      const g = ctx.createGain()
+      g.gain.value = ratio === 1 ? 0.5 : 0.28
+      o.connect(g).connect(lp)
+      o.start(at)
+      o.stop(at + len + 0.1)
+    }
+  }
+
+  /**
+   * The combo catches fire: a rolling whoosh, then brass stabs over a sub boom, like a boss
+   * walking on. `level` 1…4 is combo ×3…×6; every step is heavier, higher and longer.
+   */
+  boss(level: number): void {
+    const ctx = this.ready()
+    if (!ctx) return
+    const k = Math.min(4, Math.max(1, Math.round(level)))
+    const t = ctx.currentTime
+    const root = 73.42 * 2 ** (((k - 1) * 2) / 12)
+
+    const whoosh = this.env(ctx, 0.2 + k * 0.05, 0.16, 0.5, t)
+    const sweep = this.noiseBurst(ctx, 'bandpass', 260, 0.9, whoosh, t, 0.6)
+    sweep.frequency.setValueAtTime(260, t)
+    sweep.frequency.exponentialRampToValueAtTime(2400, t + 0.5)
+
+    const hits = [
+      { at: 0.12, m: 1, len: k === 1 ? 0.55 : 0.2 },
+      { at: 0.32, m: 1, len: k === 2 ? 0.6 : 0.2 },
+      { at: 0.52, m: 1.1225, len: 0.9 },
+    ].slice(0, k >= 3 ? 3 : k)
+    const open = 700 + k * 450
+    for (const h of hits) this.stab(ctx, t + h.at, root * h.m, h.len, 0.2 + k * 0.03, open)
+
+    const boom = ctx.createOscillator()
+    boom.type = 'sine'
+    boom.frequency.setValueAtTime(95, t + 0.12)
+    boom.frequency.exponentialRampToValueAtTime(30, t + 0.55)
+    boom.connect(this.env(ctx, 0.4 + k * 0.1, 0.004, 0.75, t + 0.12))
+    boom.start(t + 0.12)
+    boom.stop(t + 0.95)
+
+    if (k >= 3) {
+      // A growl underneath: a low saw chopped by a fast tremolo.
+      const at = t + 0.52
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.frequency.value = root / 2
+      const chop = ctx.createGain()
+      chop.gain.value = 0.55
+      const lfo = ctx.createOscillator()
+      lfo.frequency.value = 24
+      const depth = ctx.createGain()
+      depth.gain.value = 0.45
+      lfo.connect(depth).connect(chop.gain)
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 520
+      o.connect(chop).connect(lp).connect(this.env(ctx, 0.3, 0.06, 0.9, at))
+      o.start(at)
+      lfo.start(at)
+      o.stop(at + 1)
+      lfo.stop(at + 1)
+    }
+    if (k >= 4) {
+      this.noiseBurst(ctx, 'highpass', 3200, 0.5, this.env(ctx, 0.2, 0.004, 1.1, t + 0.52), t + 0.52, 0.6)
+      this.stamp()
+    }
   }
 
   /** Rising chime, e.g. streak extended or combo tier reached. */

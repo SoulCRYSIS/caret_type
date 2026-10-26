@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { clusters, unitCount, WordMatcher } from './graphemes'
 import { WordPicker } from './picker'
-import { dressWord } from './loader'
+import { dressWord, numberWords } from './loader'
+import { LANGUAGES } from './languages'
 
 function typeAll(word: string, keys: string[]) {
   const m = new WordMatcher(word)
@@ -94,6 +95,20 @@ describe('WordPicker', () => {
   it('dedupes and rejects empty lists', () => {
     expect(new WordPicker(['x', 'x', ' x ']).size).toBe(1)
     expect(() => new WordPicker([])).toThrow()
+  })
+})
+
+describe('languages', () => {
+  it('have unique ids, safe for board names and security rules', () => {
+    const ids = LANGUAGES.map((l) => l.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const id of ids) expect(id).toMatch(/^[a-z]+(-[a-z]+)*$/)
+  })
+
+  it('generates digit strings across every length', () => {
+    const words = numberWords(20, () => 0.5)
+    for (const w of words) expect(w).toMatch(/^[1-9][0-9]*$/)
+    expect(new Set(words.map((w) => w.length))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
   })
 })
 

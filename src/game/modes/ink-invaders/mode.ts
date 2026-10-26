@@ -3,6 +3,7 @@ import { clusters, unitCount, WordMatcher } from '../../words/graphemes'
 import type { GameMode, ModeContext, RunResult } from '../types'
 import { accuracy, comboAfterMiss, killScore, multiplier, waveBonus, wpm } from './scoring'
 import { enemyPos, marginY } from './geometry'
+import { comboPower } from './power'
 import { inkCard } from './card'
 import type { Enemy, InkDetails, InkState } from './state'
 import { InkIntro } from './Intro'
@@ -143,11 +144,14 @@ function kill(s: InkState, e: Enemy, ctx: ModeContext) {
   s.inked.push({ word: e.word, secs: Math.max(0.05, ctx.elapsed() - e.lockedAt), heavy: e.heavy, wave: s.wave })
   removeEnemy(s, e)
 
-  juice.hitstop(e.heavy ? 120 : Math.min(90, 38 + units * 4))
-  juice.splatter(p.x, p.y, { color: c.ink, count: 14 + units * 3, power: 340 + units * 18 })
-  juice.splatter(p.x, p.y, { color: c.accent, count: 6 + units, power: 300, stains: false })
-  juice.particles.stain(p.x, p.y, 14 + units * 2.2, c.ink, 0.09, 9)
+  const pw = comboPower(multiplier(s.combo))
+  juice.hitstop((e.heavy ? 120 : Math.min(90, 38 + units * 4)) + pw.hitstop)
+  juice.splatter(p.x, p.y, { color: c.ink, count: Math.round((14 + units * 3) * pw.particles), power: (340 + units * 18) * pw.force })
+  juice.splatter(p.x, p.y, { color: c.accent, count: Math.round((6 + units) * pw.particles), power: 300 * pw.force, stains: false })
+  juice.particles.stain(p.x, p.y, (14 + units * 2.2) * (1 + pw.level * 0.12), c.ink, 0.09, 9)
   juice.particles.ring(p.x, p.y, c.accent, 36 + units * 5)
+  for (let i = 0; i < pw.rings; i++) juice.particles.ring(p.x, p.y, i % 2 ? c.ink : c.accent, 60 + units * 5 + (i + 1) * 34, 2 + i * 0.6)
+  juice.audio.thump(pw.thump)
   juice.particles.ghost(e.word, p.x, p.y, c.accent, FONT_MONO, ENEMY_FONT_PX)
   const t = hudTarget(s)
   juice.particles.flyText(`+${pts}`, p.x, p.y - 8, t.x, t.y, c.accent, FONT_MONO, () => {
@@ -155,7 +159,7 @@ function kill(s: InkState, e: Enemy, ctx: ModeContext) {
     s.scoreBump++
     ctx.invalidate()
   })
-  juice.trauma(Math.min(0.55, 0.16 + units * 0.025) * (e.heavy ? 1.6 : 1))
+  juice.trauma(Math.min(0.55, 0.16 + units * 0.025) * (e.heavy ? 1.6 : 1) * pw.shake)
   juice.audio.splat(units, s.combo)
   if (e.heavy) {
     juice.slowmo(0.3, 260, 300)
@@ -176,18 +180,31 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
   const p = enemyPos(e, ctx, s.time)
   const w = e.w || 90
   const c = juice.colors()
+  const after = multiplier(s.combo)
+  const pw = comboPower(after)
   juice.splatter(p.x + 12 + ((w - 24) * e.matcher.typed) / e.matcher.length, p.y + (e.h || 40) * 0.5, {
     color: c.accent,
-    count: 3,
-    power: 150,
+    count: Math.round(3 * pw.particles),
+    power: 150 * pw.force,
     stains: false,
   })
+  if (pw.keyShake) juice.trauma(pw.keyShake)
 
-  const after = multiplier(s.combo)
   if (after > before) {
     s.comboPulse++
-    juice.audio.chime(after)
-    juice.trauma(0.12)
+    // Once the page catches fire (×3+) the tier-up is a boss sting instead of a chime.
+    if (after >= 3) juice.audio.boss(after - 2)
+    else juice.audio.chime(after)
+    juice.trauma(0.12 + after * 0.05)
+    // A new tier lands with a shockwave from the word, bigger every time.
+    const burst = comboPower(after)
+    juice.splatter(p.x + w / 2, p.y + (e.h || 40) / 2, { color: c.accent, count: 10 + burst.level * 8, power: 260 + burst.level * 50, stains: false })
+    for (let i = 0; i < Math.min(4, burst.level); i++) juice.particles.ring(p.x + w / 2, p.y + (e.h || 40) / 2, i % 2 ? c.ink : c.accent, 90 + i * 55, 3)
+    if (after >= 4) {
+      juice.hitstop(50 + after * 10)
+      juice.slowmo(0.55, 90 + after * 15, 160)
+    }
+    if (after >= 6) juice.particles.stain(p.x + w / 2, p.y + (e.h || 40) / 2, 70, c.accent, 0.14, 12)
   }
   if (e.matcher.done) kill(s, e, ctx)
 }

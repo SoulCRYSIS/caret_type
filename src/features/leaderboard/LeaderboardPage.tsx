@@ -4,6 +4,8 @@ import { MODES } from '../../game/modes/registry'
 import { LANGUAGES, TIERS, type LanguageId, type Tier } from '../../game/words/languages'
 import { Select } from '../../ui'
 import { Avatar, SignInButtons } from '../auth/AuthControls'
+import { loadCustomAvatars } from '../auth/avatarCache'
+import { CUSTOM_AVATAR } from '../auth/avatars'
 import { useAuth } from '../auth/authStore'
 import { useSettings } from '../settings/settingsStore'
 import * as settingsCss from '../settings/settings.css'
@@ -22,7 +24,7 @@ function Row({ entry, rank, self }: { entry: LeaderboardEntry; rank: number; sel
       <span className={css.rank} data-top={rank <= 3}>
         {rank}
       </span>
-      <Avatar user={{ uid: entry.uid, displayName: entry.name, photoURL: entry.photoURL }} />
+      <Avatar user={{ uid: entry.uid, displayName: entry.name, avatar: entry.avatar ?? null }} />
       <span className={css.name}>{entry.name}</span>
       <span className={css.score}>{entry.score.toLocaleString()}</span>
       <span className={css.metric}>{entry.wpm.toFixed(0)} wpm</span>
@@ -41,7 +43,9 @@ function Board({ id, uid }: { id: string; uid: string }) {
     import('./api')
       .then(async (api) => {
         const [entries, own] = await Promise.all([api.fetchBoard(id), api.fetchOwnEntry(id, uid)])
-        if (alive) setState({ kind: 'ready', entries, own })
+        if (!alive) return
+        void loadCustomAvatars([...entries, ...(own ? [own.entry] : [])].filter((e) => e.avatar === CUSTOM_AVATAR).map((e) => e.uid))
+        setState({ kind: 'ready', entries, own })
       })
       .catch((err) => {
         console.error(err)
@@ -105,7 +109,7 @@ export default function LeaderboardPage() {
             <span>for</span>
             <Select ariaLabel="mode" value={mode} onChange={setMode} options={MODES.map((m) => ({ value: m.id, label: m.name }))} />
             <span>in</span>
-            <Select<LanguageId> ariaLabel="language" value={lang} onChange={setLang} options={LANGUAGES.map((l) => ({ value: l.id, label: l.name.toLowerCase() }))} />
+            <Select<LanguageId> ariaLabel="language" value={lang} onChange={setLang} options={LANGUAGES.map((l) => ({ value: l.id, label: l.name.toLowerCase(), hint: l.hint }))} />
             <span>at</span>
             <Select<Tier> ariaLabel="difficulty" value={tier} onChange={setTier} options={TIERS.map((t) => ({ value: t.id, label: t.name }))} />
           </div>

@@ -8,6 +8,17 @@ export const root = style({
   userSelect: 'none',
 })
 
+/* Flames climb the page edges once the combo is hot (drawn on a canvas, see FireLayer.tsx / flames.ts). */
+export const fire = style({
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  pointerEvents: 'none',
+  /* A touch of blur turns the tongues into flame instead of paper cut-outs. */
+  filter: 'blur(1.4px)',
+})
+
 /* --- enemy stamp --- */
 
 const stampIn = keyframes({

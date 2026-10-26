@@ -16,7 +16,7 @@ export interface SetBest {
 export function bestsBySet(runs: RunResult[]): SetBest[] {
   const map = new Map<string, SetBest>()
   for (const r of runs) {
-    const key = `${r.modeId}_${r.language}_${r.tier}`
+    const key = setKeyOf(r)
     const b = map.get(key) ?? { key, modeId: r.modeId, language: r.language, tier: r.tier, runs: 0, bestScore: 0, bestWpm: 0, bestWave: 0 }
     b.runs++
     b.bestScore = Math.max(b.bestScore, r.score)
@@ -25,6 +25,36 @@ export function bestsBySet(runs: RunResult[]): SetBest[] {
     map.set(key, b)
   }
   return [...map.values()].sort((a, b) => b.bestScore - a.bestScore)
+}
+
+export const setKeyOf = (r: Pick<RunResult, 'modeId' | 'language' | 'tier'>) => `${r.modeId}_${r.language}_${r.tier}`
+
+/** The set (mode · language · tier) played most; ties go to the highest score. */
+export function mostPlayedKey(bests: SetBest[]): string | null {
+  let top: SetBest | null = null
+  for (const b of bests) if (!top || b.runs > top.runs) top = b
+  return top?.key ?? null
+}
+
+/** A round axis top and step for values up to `max`, giving 3–5 gridlines. */
+export function niceScale(max: number): { top: number; step: number } {
+  const target = Math.max(max, 10)
+  const step = [5, 10, 20, 25, 50, 100, 200].find((s) => target / s <= 4) ?? 500
+  return { top: Math.ceil(target / step) * step, step }
+}
+
+/** Month label above the first week column of each month; the first column drops its label if the next month starts right after. */
+export function monthLabels(weeks: string[][], nameOf: (month: number) => string): (string | null)[] {
+  const labels = weeks.map((col, i) => {
+    const first = col.find(Boolean)
+    if (!first) return null
+    const month = Number(first.slice(5, 7))
+    const prev = i > 0 ? weeks[i - 1].find(Boolean) : undefined
+    return !prev || Number(prev.slice(5, 7)) !== month ? nameOf(month) : null
+  })
+  const next = labels.findIndex((l, i) => i > 0 && l)
+  if (labels[0] && next !== -1 && next < 3) labels[0] = null
+  return labels
 }
 
 export function mean(values: number[]): number {

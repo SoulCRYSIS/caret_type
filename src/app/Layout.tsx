@@ -57,6 +57,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <>
       <header className={css.header} data-hidden={hidden} data-solid={solid}>
         <Link to="/" className={css.wordmark} aria-label="caret — play">
+          <span className={css.wordmarkText}>caret</span>
           <CaretMark className={css.wordmarkMark} />
         </Link>
         <nav className={css.nav}>

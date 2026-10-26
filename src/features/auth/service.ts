@@ -17,12 +17,14 @@ import {
   type AuthProvider,
   type User,
 } from 'firebase/auth'
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../../lib/firebase'
 import type { RunResult } from '../../game/modes/types'
 import { fetchOwnEntry, submitRun, type BoardUser, type SubmitResult } from '../leaderboard/api'
 import { MODES } from '../../game/modes/registry'
 import { LANGUAGES, TIERS } from '../../game/words/languages'
+import { CUSTOM_AVATAR } from './avatars'
+import { DATA_PREFIX } from './resizeAvatar'
 import { boardId, PERIODS } from '../leaderboard/periods'
 import { mergeStats, useProgress, type Stats } from '../progress/progressStore'
 import { pickSettings, type Settings } from '../settings/settingsStore'
@@ -31,7 +33,7 @@ import type { ProviderId } from './providers'
 
 export interface RemoteUserDoc {
   displayName: string | null
-  photoURL: string | null
+  avatar?: string | null
   /** Set once the player has picked their own name. */
   named?: boolean
   settings?: Settings
@@ -126,8 +128,8 @@ export function signOutUser(): Promise<void> {
 
 const userRef = (uid: string) => doc(db, 'users', uid)
 
-export function toBoardUser(u: User): BoardUser {
-  return { uid: u.uid, displayName: u.displayName, photoURL: u.photoURL }
+export function toBoardUser(u: User, avatar: string | null): BoardUser {
+  return { uid: u.uid, displayName: u.displayName, avatar }
 }
 
 /**
@@ -136,7 +138,7 @@ export function toBoardUser(u: User): BoardUser {
  * unless the account's email isn't confirmed yet, in which case they wait on this device.
  * Returns remote settings if the account already had some, and whether the player has chosen a name yet.
  */
-export async function syncOnSignIn(user: User, localSettings: Settings): Promise<{ settings: Settings | null; named: boolean }> {
+export async function syncOnSignIn(user: User, localSettings: Settings): Promise<{ settings: Settings | null; named: boolean; avatar: string | null; customAvatar: string | null }> {
   const progress = useProgress.getState()
   if (progress.ownerUid && progress.ownerUid !== user.uid) progress.reset()
   const local = useProgress.getState()
@@ -153,7 +155,6 @@ export async function syncOnSignIn(user: User, localSettings: Settings): Promise
     userRef(user.uid),
     {
       displayName: user.displayName,
-      photoURL: user.photoURL,
       streak,
       stats,
       ...(settings ? {} : { settings: pickSettings(localSettings) }),
@@ -174,34 +175,52 @@ export async function syncOnSignIn(user: User, localSettings: Settings): Promise
       const key = `${run.modeId}_${run.language}_${run.tier}`
       if ((best.get(key)?.score ?? -1) < run.score) best.set(key, run)
     }
-    await Promise.all([...best.values()].map((run) => submitRun(toBoardUser(user), run).catch(() => null)))
+    await Promise.all([...best.values()].map((run) => submitRun(toBoardUser(user, remote?.avatar ?? null), run).catch(() => null)))
   }
 
   useProgress.getState().adopt(user.uid, streak, stats)
   if (verified) useProgress.getState().clearUnsynced()
-  return { settings, named: remote?.named === true }
+  const customAvatar = remote?.avatar === CUSTOM_AVATAR ? await fetchOwnAvatar(user.uid) : null
+  return { settings, named: remote?.named === true, avatar: remote?.avatar ?? null, customAvatar }
 }
 
-/** Renames the account everywhere it shows, including this period's standings. Past days and weeks keep the old name. */
-export async function setDisplayName(user: User, name: string): Promise<void> {
+const avatarRef = (uid: string) => doc(db, 'avatars', uid)
+
+async function fetchOwnAvatar(uid: string): Promise<string | null> {
+  const snap = await getDoc(avatarRef(uid))
+  const png = snap.exists() ? snap.data().png : null
+  return typeof png === 'string' ? DATA_PREFIX + png : null
+}
+
+/**
+ * Updates name and face everywhere they show, including this period's standings. Past days and weeks keep the old ones.
+ * `uploadedPng` is the player's own picture (a data URL) when `avatar` is the custom id.
+ */
+export async function setProfile(user: User, name: string, avatar: string | null, uploadedPng: string | null): Promise<void> {
   await updateProfile(user, { displayName: name })
-  await setDoc(userRef(user.uid), { displayName: name, named: true, updatedAt: serverTimestamp() }, { merge: true })
+  if (avatar === CUSTOM_AVATAR && uploadedPng) {
+    await setDoc(avatarRef(user.uid), { png: uploadedPng.slice(DATA_PREFIX.length), updatedAt: serverTimestamp() })
+  } else if (avatar && avatar !== CUSTOM_AVATAR) {
+    // moving to a built-in face: drop the old upload
+    await deleteDoc(avatarRef(user.uid)).catch(() => {})
+  }
+  await setDoc(userRef(user.uid), { displayName: name, ...(avatar ? { avatar } : {}), named: true, updatedAt: serverTimestamp() }, { merge: true })
   const refs = MODES.flatMap((m) =>
     LANGUAGES.flatMap((l) => TIERS.flatMap((t) => PERIODS.map((p) => doc(db, 'leaderboards', boardId(m.id, l.id, t.id, p.id), 'entries', user.uid)))),
   )
   const snaps = await Promise.all(refs.map((ref) => getDoc(ref)))
   const batch = writeBatch(db)
-  for (const snap of snaps) if (snap.exists()) batch.update(snap.ref, { name: name.slice(0, 60) })
+  for (const snap of snaps) if (snap.exists()) batch.update(snap.ref, { name: name.slice(0, 60), ...(avatar ? { avatar } : {}) })
   await batch.commit()
 }
 
-export async function saveRun(user: User, run: RunResult): Promise<SubmitResult> {
+export async function saveRun(user: User, avatar: string | null, run: RunResult): Promise<SubmitResult> {
   const { streak, stats } = useProgress.getState()
   const batch = writeBatch(db)
   batch.set(doc(collection(userRef(user.uid), 'runs')), { ...run, createdAt: serverTimestamp() })
   batch.set(userRef(user.uid), { streak, stats, updatedAt: serverTimestamp() }, { merge: true })
   await batch.commit()
-  return submitRun(toBoardUser(user), run)
+  return submitRun(toBoardUser(user, avatar), run)
 }
 
 /** Where a run that was posted during sign-in ended up on its all-time board. */

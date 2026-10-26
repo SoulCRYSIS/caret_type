@@ -71,9 +71,22 @@ export const down = style({ color: vars.color.error, fontFamily: vars.font.mono,
 export const chart = style({
   display: 'block',
   width: '100%',
-  height: 150,
+  height: 'auto',
+  maxWidth: 680,
   overflow: 'visible',
 })
+
+export const chartPick = style({
+  display: 'flex',
+  alignItems: 'baseline',
+  flexWrap: 'wrap',
+  gap: 8,
+  fontSize: 15,
+  color: vars.color.muted,
+})
+
+export const chartGrid = style({ stroke: tone.rule, strokeWidth: 1, strokeDasharray: '2 4' })
+export const chartAxis = style({ stroke: tone.ruleStrong, strokeWidth: 1 })
 
 export const chartLine = style({
   fill: 'none',
@@ -81,30 +94,37 @@ export const chartLine = style({
   strokeWidth: 1.6,
   strokeLinejoin: 'round',
   strokeLinecap: 'round',
-  vectorEffect: 'non-scaling-stroke',
+  opacity: 0.55,
 })
 
 export const chartAvg = style({
   stroke: vars.color.accent,
-  strokeWidth: 1,
-  strokeDasharray: '3 5',
-  vectorEffect: 'non-scaling-stroke',
+  strokeWidth: 1.2,
+  strokeDasharray: '4 4',
 })
 
 export const chartDot = style({ fill: vars.color.ink })
-export const chartBest = style({ fill: vars.color.accent })
+export const chartBest = style({ fill: vars.color.accent, stroke: vars.color.paper, strokeWidth: 1.5 })
 
 export const chartLabel = style({
   fontFamily: vars.font.mono,
-  fontSize: 10,
+  fontSize: 11,
   fill: vars.color.muted,
+})
+
+export const chartAvgLabel = style([chartLabel, { fill: vars.color.accent }])
+export const chartBestLabel = style([chartLabel, { fill: vars.color.ink, fontWeight: 600 }])
+
+export const calendarWrap = style({
+  display: 'flex',
+  gap: 8,
+  overflowX: 'auto',
+  paddingBottom: 4,
 })
 
 export const calendar = style({
   display: 'flex',
   gap: 4,
-  overflowX: 'auto',
-  paddingBottom: 4,
 })
 
 export const calCol = style({
@@ -112,6 +132,36 @@ export const calCol = style({
   flexDirection: 'column',
   gap: 4,
 })
+
+export const calHead = style({
+  height: 14,
+  width: 14,
+  overflow: 'visible',
+  whiteSpace: 'nowrap',
+  fontFamily: vars.font.mono,
+  fontSize: 10,
+  lineHeight: '14px',
+  color: vars.color.muted,
+})
+
+export const calWeekday = style({
+  height: 14,
+  paddingRight: 2,
+  fontFamily: vars.font.mono,
+  fontSize: 10,
+  lineHeight: '14px',
+  color: vars.color.muted,
+})
+
+export const legend = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  fontSize: 13,
+  color: vars.color.muted,
+})
+
+export const legendWord = style({ margin: '0 4px' })
 
 export const calDay = style({
   width: 14,

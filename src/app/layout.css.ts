@@ -50,10 +50,20 @@ export const wordmark = style({
   ':hover': { transform: 'translateY(-1px) rotate(-4deg)' },
 })
 
+export const wordmarkText = style({
+  fontFamily: vars.font.display,
+  fontStyle: 'italic',
+  fontWeight: 600,
+  fontSize: 26,
+  lineHeight: 1,
+  letterSpacing: '-0.01em',
+})
+
 export const wordmarkMark = style({
-  width: 38,
-  height: 38,
+  width: 34,
+  height: 34,
   display: 'block',
+  marginLeft: -3,
 })
 
 globalStyle(`${wordmarkMark} circle`, { animation: `${blink} 1.05s steps(1) infinite` })

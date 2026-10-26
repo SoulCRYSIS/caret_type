@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { accuracy, comboAfterMiss, killScore, maxPlausibleScore, MISS_COMBO_PENALTY, multiplier, tierProgress, waveBonus, wpm } from './scoring'
+import { LANGUAGES, type LanguageId } from '../../words/languages'
 import { DEATH_WAVE, DOUBLING_WAVES, expectedDeathWave, TARGET_WPM, travelTime, waveConfig } from './waves'
 
 describe('scoring', () => {
@@ -60,6 +61,8 @@ describe('scoring', () => {
   })
 })
 
+const TIER_IDS = ['easy', 'medium', 'hard', 'expert'] as const
+
 describe('waves', () => {
   it('gets harder every wave', () => {
     for (let w = 1; w < 20; w++) {
@@ -101,7 +104,7 @@ describe('waves', () => {
 
   it('ends a target-speed run in wave 10, and each doubling of speed buys ten more waves', () => {
     for (const t of ['easy', 'medium', 'hard', 'expert'] as const) {
-      for (const lang of ['en', 'th'] as const) {
+      for (const lang of LANGUAGES.map((l) => l.id)) {
         const T = TARGET_WPM[t]
         expect(Math.floor(expectedDeathWave(t, lang, T))).toBe(DEATH_WAVE)
         expect(expectedDeathWave(t, lang, 2 * T)).toBeCloseTo(DEATH_WAVE + DOUBLING_WAVES, -0.5)
@@ -123,7 +126,32 @@ describe('waves', () => {
     expect(travelTime(cfg, 5, true, fixed)).toBeGreaterThan(travelTime(cfg, 5, false, fixed))
   })
 
-  it('scales Thai length bounds', () => {
-    expect(waveConfig(1, 'medium', 'th').maxLen).toBeGreaterThan(waveConfig(1, 'medium', 'en').maxLen)
+  it('takes word length from the language, never the tier', () => {
+    for (const lang of LANGUAGES) {
+      for (const w of [1, 8, 25]) {
+        const lens = TIER_IDS.map((t) => waveConfig(w, t, lang.id)).map((c) => [c.minLen, c.maxLen])
+        for (const l of lens) expect(l).toEqual(lens[0])
+      }
+    }
+  })
+
+  it('gives each step up in language longer words', () => {
+    const max = (id: LanguageId) => waveConfig(1, 'medium', id).maxLen
+    const min = (id: LanguageId) => waveConfig(1, 'medium', id).minLen
+    expect(max('en-mid')).toBeGreaterThan(max('en'))
+    expect(max('en-adv')).toBeGreaterThan(max('en-mid'))
+    expect(min('en-adv')).toBeGreaterThan(min('en-mid'))
+    expect(max('th-mid')).toBeGreaterThan(max('th'))
+    expect(max('numbers')).toBeLessThanOrEqual(max('en'))
+  })
+
+  it('keeps word-length bounds sane in every language', () => {
+    for (const lang of LANGUAGES) {
+      for (const w of [1, 10, 40]) {
+        const c = waveConfig(w, 'medium', lang.id)
+        expect(c.minLen).toBeGreaterThanOrEqual(1)
+        expect(c.maxLen).toBeGreaterThanOrEqual(c.minLen)
+      }
+    }
   })
 })

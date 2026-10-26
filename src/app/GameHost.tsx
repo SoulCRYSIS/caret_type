@@ -113,13 +113,13 @@ export function GameHost() {
     let alive = true
     setWords(null)
     setWordsError(false)
-    loadWords(language, tier)
+    loadWords(language)
       .then((w) => alive && setWords(w))
       .catch(() => alive && setWordsError(true))
     return () => {
       alive = false
     }
-  }, [language, tier])
+  }, [language])
 
   const endSession = useCallback(() => {
     sessionRef.current?.destroy()

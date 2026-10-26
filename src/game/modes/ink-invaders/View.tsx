@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import type { ModeContext, ModeViewProps } from '../types'
+import { FireLayer } from './FireLayer'
 import { enemyPos, marginY } from './geometry'
 import { COMBO_TIERS, multiplier, tierProgress } from './scoring'
 import type { Banner, Enemy, InkState } from './state'
@@ -77,6 +78,7 @@ export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
         s.rootEl = el
       }}
     >
+      <FireLayer level={s.phase === 'over' || s.phase === 'dying' ? 0 : Math.max(0, mult - 2)} juice={ctx.juice} />
       <div className={css.notebookRule} />
 
       <div className={css.hud}>

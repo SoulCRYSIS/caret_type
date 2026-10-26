@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getMode } from '../../game/modes/registry'
 import type { RunResult } from '../../game/modes/types'
 import { getLanguage } from '../../game/words/languages'
-import { Rule } from '../../ui'
+import { Rule, Select } from '../../ui'
 import { Avatar, SignInButtons } from '../auth/AuthControls'
 import { loadService, useAuth } from '../auth/authStore'
 import { useProgress } from '../progress/progressStore'
@@ -12,7 +12,7 @@ import { Tally } from '../streak/StreakMark'
 import { MAX_FREEZES, viewStreak } from '../streak/streak'
 import * as streakCss from '../streak/streak.css'
 import { useToday } from '../streak/useToday'
-import { bestsBySet, calendarWeeks, mean, playsByDay, trend } from './analysis'
+import { bestsBySet, calendarWeeks, mean, monthLabels, mostPlayedKey, niceScale, playsByDay, setKeyOf, trend } from './analysis'
 import * as css from './profile.css'
 
 function StreakTally({ count }: { count: number }) {
@@ -57,9 +57,9 @@ function useRuns(): { runs: RunResult[]; loading: boolean } {
   return useMemo(() => {
     if (!user) return { runs: history, loading: false }
     if (!remote || remote.uid !== user.uid) return { runs: history, loading: true }
-    const seen = new Set(remote.runs.map((r) => r.startedAt))
-    const extra = [...unsynced, ...history].filter((r) => !seen.has(r.startedAt) && (seen.add(r.startedAt), true))
-    const runs = remote.runs.length ? [...remote.runs, ...extra].sort((a, b) => b.endedAt - a.endedAt) : history
+    const seen = new Set<number>()
+    const fresh = (r: RunResult) => !seen.has(r.startedAt) && (seen.add(r.startedAt), true)
+    const runs = remote.runs.length ? [...remote.runs, ...unsynced, ...history].filter(fresh).sort((a, b) => b.endedAt - a.endedAt) : history
     return { runs, loading: false }
   }, [user, remote, history, unsynced])
 }
@@ -75,56 +75,103 @@ function Figure({ label, value, children }: { label: string; value: string; chil
   )
 }
 
-function FormChart({ runs }: { runs: RunResult[] }) {
+const dateLabel = (t: number) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+
+/** Words per minute for each run in one set, oldest to newest. */
+function SpeedChart({ runs }: { runs: RunResult[] }) {
   const series = runs.slice(0, 40).reverse()
-  if (series.length < 2) return <span className={css.caption}>Play a few more runs to see your form.</span>
-  const w = 600
-  const h = 120
+  if (series.length < 2) return <span className={css.caption}>Play this set twice or more and your speed over time shows up here.</span>
+  const W = 640
+  const H = 190
+  const pad = { l: 36, r: 12, t: 12, b: 26 }
   const values = series.map((r) => r.wpm)
-  const max = Math.max(20, ...values) * 1.1
-  const step = w / (series.length - 1)
-  const y = (v: number) => h - (v / max) * h
+  const { top, step } = niceScale(Math.max(...values))
+  const x = (i: number) => pad.l + (i / (series.length - 1)) * (W - pad.l - pad.r)
+  const y = (v: number) => pad.t + (1 - v / top) * (H - pad.t - pad.b)
   const avg = mean(values)
   const best = values.indexOf(Math.max(...values))
+  const ticks = Array.from({ length: Math.floor(top / step) + 1 }, (_, i) => i * step)
+  const bestAnchor = best > series.length * 0.8 ? 'end' : best < series.length * 0.2 ? 'start' : 'middle'
   return (
-    <svg className={css.chart} viewBox={`0 -10 ${w} ${h + 30}`} preserveAspectRatio="none" aria-label="words per minute over recent runs">
-      <line className={css.chartAvg} x1={0} x2={w} y1={y(avg)} y2={y(avg)} />
-      <polyline className={css.chartLine} points={values.map((v, i) => `${i * step},${y(v)}`).join(' ')} />
-      {values.map((v, i) => (
-        <circle key={i} className={i === best ? css.chartBest : css.chartDot} cx={i * step} cy={y(v)} r={i === best ? 4 : 2.2} />
+    <svg className={css.chart} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`words per minute across your last ${series.length} runs, average ${avg.toFixed(0)}`}>
+      {ticks.map((t) => (
+        <g key={t}>
+          <line className={t === 0 ? css.chartAxis : css.chartGrid} x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} />
+          <text className={css.chartLabel} x={pad.l - 6} y={y(t) + 3.5} textAnchor="end">
+            {t}
+          </text>
+        </g>
       ))}
-      <text className={css.chartLabel} x={0} y={h + 22}>
-        {series.length} runs ago
+      <line className={css.chartAvg} x1={pad.l} x2={W - pad.r} y1={y(avg)} y2={y(avg)} />
+      <text className={css.chartAvgLabel} x={W - pad.r} y={y(avg) - 5} textAnchor="end">
+        average {avg.toFixed(1)}
       </text>
-      <text className={css.chartLabel} x={w} y={h + 22} textAnchor="end">
-        latest · avg {avg.toFixed(1)} wpm
+      <polyline className={css.chartLine} points={values.map((v, i) => `${x(i)},${y(v)}`).join(' ')} />
+      {series.map((r, i) => (
+        <circle key={r.startedAt} className={i === best ? css.chartBest : css.chartDot} cx={x(i)} cy={y(r.wpm)} r={i === best ? 5 : 3}>
+          <title>{`${dateLabel(r.endedAt)} · ${r.wpm.toFixed(1)} wpm · score ${r.score.toLocaleString()}`}</title>
+        </circle>
+      ))}
+      <text className={css.chartBestLabel} x={x(best)} y={y(values[best]) - 10} textAnchor={bestAnchor}>
+        best {values[best].toFixed(1)}
+      </text>
+      <text className={css.chartLabel} x={pad.l} y={H - 6}>
+        {dateLabel(series[0].endedAt)}
+      </text>
+      <text className={css.chartLabel} x={W - pad.r} y={H - 6} textAnchor="end">
+        {dateLabel(series[series.length - 1].endedAt)}
       </text>
     </svg>
   )
 }
 
+const WEEKDAYS = ['Mon', '', 'Wed', '', 'Fri', '', '']
+const monthName = (m: number) => new Date(2000, m - 1, 1).toLocaleDateString(undefined, { month: 'short' })
+
 function Calendar({ runs, today }: { runs: RunResult[]; today: string }) {
   const days = useMemo(() => playsByDay(runs), [runs])
   const weeks = useMemo(() => calendarWeeks(new Date(`${today}T12:00:00`), 20), [today])
+  const months = useMemo(() => monthLabels(weeks, monthName), [weeks])
+  const active = weeks.flat().filter((d) => d && days.has(d)).length
   return (
-    <div className={css.calendar} aria-label="days played, last 20 weeks">
-      {weeks.map((col, i) => (
-        <div key={i} className={css.calCol}>
-          {col.map((day, j) => {
-            const n = day ? (days.get(day) ?? 0) : 0
-            return (
-              <span
-                key={j}
-                className={css.calDay}
-                data-empty={!day}
-                data-today={day === today}
-                data-level={n === 0 ? 0 : n < 3 ? 1 : n < 6 ? 2 : 3}
-                title={day ? `${day}: ${n} ${n === 1 ? 'run' : 'runs'}` : undefined}
-              />
-            )
-          })}
+    <div className={settingsCss.stack}>
+      <div className={css.calendarWrap}>
+        <div className={css.calCol} aria-hidden>
+          <span className={css.calHead} />
+          {WEEKDAYS.map((d, i) => (
+            <span key={i} className={css.calWeekday}>
+              {d}
+            </span>
+          ))}
         </div>
-      ))}
+        <div className={css.calendar} role="img" aria-label={`days played over the last 20 weeks: ${active} days`}>
+          {weeks.map((col, i) => (
+            <div key={i} className={css.calCol}>
+              <span className={css.calHead}>{months[i]}</span>
+              {col.map((day, j) => {
+                const n = day ? (days.get(day) ?? 0) : 0
+                return (
+                  <span
+                    key={j}
+                    className={css.calDay}
+                    data-empty={!day}
+                    data-today={day === today}
+                    data-level={n === 0 ? 0 : n < 3 ? 1 : n < 6 ? 2 : 3}
+                    title={day ? `${day}: ${n} ${n === 1 ? 'run' : 'runs'}` : undefined}
+                  />
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className={css.legend}>
+        <span className={css.legendWord}>less</span>
+        {[0, 1, 2, 3].map((l) => (
+          <span key={l} className={css.calDay} data-level={l} />
+        ))}
+        <span className={css.legendWord}>more</span>
+      </div>
     </div>
   )
 }
@@ -140,6 +187,9 @@ export default function ProfilePage() {
   const { runs, loading } = useRuns()
   const bests = useMemo(() => bestsBySet(runs), [runs])
   const form = useMemo(() => trend(runs), [runs])
+  const [picked, setPicked] = useState<string | null>(null)
+  const chartKey = picked && bests.some((b) => b.key === picked) ? picked : mostPlayedKey(bests)
+  const chartRuns = useMemo(() => runs.filter((r) => setKeyOf(r) === chartKey), [runs, chartKey])
   const avgAcc = useMemo(() => mean(runs.slice(0, 20).map((r) => r.accuracy)), [runs])
   const signedIn = !!user
 
@@ -214,10 +264,29 @@ export default function ProfilePage() {
       </section>
 
       <section className={settingsCss.section}>
-        <h2 className={settingsCss.sectionTitle}>form</h2>
+        <h2 className={settingsCss.sectionTitle}>speed over time</h2>
         <div className={settingsCss.stack}>
-          <FormChart runs={runs} />
+          {bests.length > 1 && (
+            <div className={css.chartPick}>
+              <span>showing</span>
+              <Select
+                ariaLabel="set to chart"
+                value={chartKey ?? ''}
+                onChange={setPicked}
+                options={bests.map((b) => ({ value: b.key, label: `${getMode(b.modeId).name} · ${getLanguage(b.language).name.toLowerCase()} · ${b.tier}`, hint: `${b.runs} ${b.runs === 1 ? 'run' : 'runs'}` }))}
+              />
+            </div>
+          )}
+          <SpeedChart runs={chartRuns} />
+          <span className={css.caption}>Each dot is one run, oldest to newest, in words per minute. The dashed line is your average and the filled dot your best.</span>
+        </div>
+      </section>
+
+      <section className={settingsCss.section}>
+        <h2 className={settingsCss.sectionTitle}>days played</h2>
+        <div className={settingsCss.stack}>
           <Calendar runs={runs} today={today} />
+          <span className={css.caption}>One square per day for the last 20 weeks; darker means more runs. Today is outlined.</span>
         </div>
       </section>
 

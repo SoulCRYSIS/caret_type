@@ -16,8 +16,7 @@ const SettingsPage = lazy(() => import('../features/settings/SettingsPage'))
 function useBoot() {
   usePaletteSync()
   useEffect(() => {
-    const { language, tier } = useSettings.getState()
-    prefetchWords(language, tier)
+    prefetchWords(useSettings.getState().language)
     const ready = setTimeout(() => (document.documentElement.dataset.ready = 'true'), 300)
     const idle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 300))
     idle(() => initAuth())

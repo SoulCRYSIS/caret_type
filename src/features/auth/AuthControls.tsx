@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Button, Popover, Rule } from '../../ui'
 import {
-  changeName,
+  changeProfile,
   checkVerified,
   clearAuthError,
   NAME_MAX,
@@ -16,19 +16,93 @@ import {
   useAuth,
   type AuthUser,
 } from './authStore'
+import { useAvatarCache } from './avatarCache'
+import { AVATARS, CUSTOM_AVATAR, resolveAvatar } from './avatars'
+import { resizeAvatar } from './resizeAvatar'
 import { FacebookIcon, GitHubIcon, GoogleIcon, MailIcon, MicrosoftIcon } from './icons'
 import { PROVIDERS, type ProviderId } from './providers'
 import * as css from './auth.css'
 
 const PROVIDER_ICONS: Record<ProviderId, typeof GoogleIcon> = { google: GoogleIcon, github: GitHubIcon, microsoft: MicrosoftIcon, facebook: FacebookIcon }
 
-export function Avatar({ user }: { user: AuthUser }) {
-  const [broken, setBroken] = useState(false)
-  if (user.photoURL && !broken) {
-    return <img className={css.avatar} src={user.photoURL} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} />
+/** The chosen face: a built-in picture, the player's upload, or the name's first letter while there is neither. */
+export function Avatar({ user, size }: { user: Pick<AuthUser, 'uid' | 'avatar'> & { displayName?: string | null }; size?: number }) {
+  const upload = useAvatarCache((s) => s.urls[user.uid])
+  const src = user.avatar === CUSTOM_AVATAR ? upload : resolveAvatar(user.avatar, user.uid)?.url
+  return (
+    <span className={css.avatar} style={size ? { width: size, height: size } : undefined}>
+      {src ? <img className={css.avatarImg} src={src} alt="" draggable={false} /> : (user.displayName ?? '?').trim().charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
+function AvatarPicker({
+  value,
+  custom,
+  onChange,
+  onUpload,
+}: {
+  value: string | null
+  /** The player's own picture, once there is one. */
+  custom: string | null
+  onChange: (id: string) => void
+  onUpload: (png: string) => void
+}) {
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const pickFile = async (file: File | undefined) => {
+    if (!file) return
+    setBusy(true)
+    setError(null)
+    try {
+      onUpload(await resizeAvatar(file))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That picture couldn't be used.")
+    }
+    setBusy(false)
   }
-  const initial = (user.displayName ?? '?').trim().charAt(0).toUpperCase()
-  return <span className={css.initials}>{initial}</span>
+
+  const tile = (id: string, url: string, label: string) => (
+    <button
+      key={id}
+      type="button"
+      role="radio"
+      aria-checked={value === id}
+      aria-label={label}
+      title={label}
+      className={css.pick}
+      data-on={value === id}
+      onClick={() => onChange(id)}
+    >
+      <img className={css.avatarImg} src={url} alt="" draggable={false} />
+    </button>
+  )
+
+  return (
+    <>
+      {(custom || AVATARS.length > 0) && (
+        <div className={css.pickerGrid} role="radiogroup" aria-label="your face">
+          {custom && tile(CUSTOM_AVATAR, custom, 'your picture')}
+          {AVATARS.map((a) => tile(a.id, a.url, a.id.replace(/-/g, ' ')))}
+        </div>
+      )}
+      <label className={css.uploadLink}>
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className={css.fileInput}
+          disabled={busy}
+          onChange={(e) => {
+            void pickFile(e.target.files?.[0])
+            e.target.value = ''
+          }}
+        />
+        {busy ? 'resizing…' : custom ? 'replace your picture' : 'upload your own picture'}
+      </label>
+      {error && <span className={css.error}>{error}</span>}
+    </>
+  )
 }
 
 type EmailView = 'signin' | 'signup' | 'reset'
@@ -197,15 +271,30 @@ export function SignInButtons({ note = true, compact = false }: { note?: boolean
   )
 }
 
-function NameForm({ initial, action, onDone, children }: { initial: string; action: string; onDone?: () => void; children?: ReactNode }) {
-  const [name, setName] = useState(initial)
+function ProfileForm({
+  user,
+  action,
+  onDone,
+  children,
+}: {
+  user: AuthUser
+  action: string
+  onDone?: () => void
+  children?: ReactNode
+}) {
+  const [name, setName] = useState((user.displayName ?? '').slice(0, NAME_MAX))
+  const existingUpload = useAvatarCache((c) => c.urls[user.uid] ?? null)
+  const [avatar, setAvatar] = useState<string | null>(user.avatar === CUSTOM_AVATAR ? CUSTOM_AVATAR : (resolveAvatar(user.avatar, user.uid)?.id ?? null))
+  /** A picture chosen in this form and not saved yet. */
+  const [upload, setUpload] = useState<string | null>(null)
+  const custom = upload ?? existingUpload
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
-    const err = await changeName(name)
+    const err = await changeProfile(name, avatar, avatar === CUSTOM_AVATAR ? upload : null)
     setBusy(false)
     setError(err)
     if (!err) onDone?.()
@@ -213,6 +302,18 @@ function NameForm({ initial, action, onDone, children }: { initial: string; acti
 
   return (
     <form className={css.form} onSubmit={submit}>
+      <div className={css.field}>
+        <span className={css.fieldLabel}>your face</span>
+        <AvatarPicker
+          value={avatar}
+          custom={custom}
+          onChange={setAvatar}
+          onUpload={(png) => {
+            setUpload(png)
+            setAvatar(CUSTOM_AVATAR)
+          }}
+        />
+      </div>
       <label className={css.field}>
         <span className={css.fieldLabel}>name on the standings</span>
         <input
@@ -306,8 +407,8 @@ export function NamePrompt() {
           onPointerDownOutside={(e) => e.preventDefault()}
         >
           <RDialog.Title className={css.formTitle}>what should we call you?</RDialog.Title>
-          <p className={css.dialogNote}>This is the name other typists see on the standings. You can change it any time from the account menu.</p>
-          <NameForm initial={(user.displayName ?? '').slice(0, NAME_MAX)} action="save name" />
+          <p className={css.dialogNote}>Other typists see this on the standings. You can change it any time from the account menu.</p>
+          <ProfileForm user={user} action="save" />
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>
@@ -355,20 +456,20 @@ export function AccountMenu() {
     >
       {renaming ? (
         <div className={css.menuHead}>
-          <NameForm initial={user.displayName ?? ''} action="save" onDone={() => setRenaming(false)}>
+          <ProfileForm user={user} action="save" onDone={() => setRenaming(false)}>
             <div className={css.formLinks}>
               <Button variant="link" onClick={() => setRenaming(false)}>
                 cancel
               </Button>
             </div>
-          </NameForm>
+          </ProfileForm>
         </div>
       ) : (
         <div className={css.menuHead}>
           <span className={css.menuName}>{user.displayName ?? 'typist'}</span>
           <div className={css.formLinks}>
             <Button variant="link" onClick={() => setRenaming(true)}>
-              change name
+              edit profile
             </Button>
           </div>
         </div>

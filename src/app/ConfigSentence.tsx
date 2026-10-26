@@ -15,7 +15,7 @@ export function ConfigSentence() {
         ariaLabel="language"
         value={language}
         onChange={(v) => set({ language: v })}
-        options={LANGUAGES.map((l) => ({ value: l.id, label: l.name.toLowerCase(), hint: l.native !== l.name ? l.native : undefined }))}
+        options={LANGUAGES.map((l) => ({ value: l.id, label: l.name.toLowerCase(), hint: l.hint }))}
       />
       <span>at</span>
       <Select<Tier> ariaLabel="difficulty" value={tier} onChange={(v) => set({ tier: v })} options={TIERS.map((t) => ({ value: t.id, label: t.name, hint: t.hint }))} />

@@ -7,6 +7,7 @@ rules_version = '2';
 // users/{uid}                         private to the owner
 //   displayName: string|null (<= 100)
 //   named:       bool (the player picked their own display name)
+//   avatar:      string (file name of a built-in face in src/assets/avatars, or 'custom' for an upload)
 //   photoURL:    string|null (https, <= 2048)
 //   settings:    map (synced preferences, fixed keys)
 //   streak:      map { current, longest, freezes: int; lastPlayedDay: 'YYYY-MM-DD'|null }
@@ -19,9 +20,12 @@ rules_version = '2';
 //   durationMs, wpmByWave: list<number> (<= 500), startedAt, endedAt (epoch ms),
 //   createdAt: timestamp (== request.time)
 //
+// avatars/{uid}                       signed-in users read, the owner writes
+//   png: string (<= 100000, base64 of a 128×128 PNG), updatedAt: timestamp
+//
 // leaderboards/{boardId}/entries/{uid}  readable by signed-in users, written by the owner
 //   boardId = {mode}_{lang}_{tier}_{period}
-//   uid (== doc id), name (<= 60), photoURL, score, wpm, accuracy, wave, chars,
+//   uid (== doc id), name (<= 60), avatar, photoURL (legacy), score, wpm, accuracy, wave, chars,
 //   durationMs, mode, lang, tier, createdAt (== request.time)
 //   Updates must raise the score.
 //
@@ -60,12 +64,16 @@ service cloud.firestore {
       return v == null || (v is string && v.size() <= maxLen);
     }
 
+    function isAvatar(v) {
+      return v == null || (v is string && v.matches('^[a-z0-9-]{1,32}$'));
+    }
+
     function isOptionalUrl(v) {
       return v == null || (v is string && v.size() <= 2048 && v.matches('^https://.*'));
     }
 
     function validLang(lang) {
-      return lang in ['en', 'th'];
+      return lang in ['en', 'en-mid', 'en-adv', 'en-punct', 'numbers', 'code-js', 'code-py', 'th', 'th-mid', 'th-punct'];
     }
 
     function validTier(tier) {
@@ -136,9 +144,10 @@ service cloud.firestore {
     }
 
     function isValidUser(d) {
-      return d.keys().hasOnly(['displayName', 'named', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt'])
+      return d.keys().hasOnly(['displayName', 'named', 'avatar', 'photoURL', 'settings', 'streak', 'stats', 'createdAt', 'updatedAt'])
         && (!('displayName' in d) || isOptionalString(d.displayName, 100))
         && (!('named' in d) || d.named is bool)
+        && (!('avatar' in d) || isAvatar(d.avatar))
         && (!('photoURL' in d) || isOptionalUrl(d.photoURL))
         && (!('settings' in d) || isValidSettings(d.settings))
         && (!('streak' in d) || isValidStreak(d.streak))
@@ -167,12 +176,13 @@ service cloud.firestore {
 
     function isValidEntry(d, boardId, uid) {
       return d.keys().hasOnly([
-          'uid', 'name', 'photoURL', 'score', 'wpm', 'accuracy', 'wave', 'chars',
+          'uid', 'name', 'avatar', 'photoURL', 'score', 'wpm', 'accuracy', 'wave', 'chars',
           'durationMs', 'mode', 'lang', 'tier', 'createdAt'])
         && d.keys().hasAll(['uid', 'name', 'score', 'wpm', 'accuracy', 'wave', 'chars', 'durationMs', 'mode', 'lang', 'tier', 'createdAt'])
         && d.uid == uid
         && d.name is string && d.name.size() > 0 && d.name.size() <= 60
         && (!('photoURL' in d) || isOptionalUrl(d.photoURL))
+        && (!('avatar' in d) || isAvatar(d.avatar))
         && validModeId(d.mode)
         && validLang(d.lang)
         && validTier(d.tier)
@@ -200,14 +210,27 @@ service cloud.firestore {
       }
     }
 
+    // An uploaded profile picture: a 128×128 PNG, base64 without the data-URL prefix.
+    match /avatars/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['png', 'updatedAt'])
+        && request.resource.data.png is string
+        && request.resource.data.png.size() > 0
+        && request.resource.data.png.size() <= 100000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isOwner(uid);
+    }
+
     match /leaderboards/{boardId}/entries/{uid} {
       allow read: if isAuthenticated();
       allow create: if isOwner(uid) && canPost() && isValidEntry(request.resource.data, boardId, uid);
-      // Either a better run, or a rename that touches nothing else.
+      // Either a better run, or a profile edit (name and face) that touches nothing else.
       allow update: if isOwner(uid) && (
         (canPost() && isValidEntry(request.resource.data, boardId, uid)
           && request.resource.data.score > resource.data.score)
-        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'avatar'])
+          && (!('avatar' in request.resource.data) || isAvatar(request.resource.data.avatar))
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 60));

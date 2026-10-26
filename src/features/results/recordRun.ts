@@ -29,7 +29,7 @@ export function recordRun(run: RunResult): Recorded {
     board = Promise.resolve({ kind: 'unverified' })
   } else
     board = loadService()
-      .then((svc) => svc.saveRun(user, run))
+      .then((svc) => svc.saveRun(user, useAuth.getState().user?.avatar ?? null, run))
       .then((result): BoardStatus => ({ kind: 'done', result }))
       .catch((err): BoardStatus => {
         console.error(err)

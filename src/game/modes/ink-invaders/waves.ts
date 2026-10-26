@@ -1,4 +1,4 @@
-import type { LanguageId, Tier } from '../../words/languages'
+import { getLanguage, type LanguageId, type Tier } from '../../words/languages'
 
 export interface WaveConfig {
   wave: number
@@ -44,13 +44,6 @@ export const DEATH_WAVE = 10
 /** After that, the speed asked for doubles every this many waves. */
 export const DOUBLING_WAVES = 10
 
-const BASE_LEN: Record<Tier, [number, number]> = {
-  easy: [2, 3],
-  medium: [3, 4],
-  hard: [7, 8],
-  expert: [4, 6],
-}
-
 /** Words on the page at once for a player keeping pace; harder tiers are busier. */
 const ON_SCREEN: Record<Tier, number> = { easy: 4.5, medium: 5, hard: 5.5, expert: 6 }
 
@@ -69,12 +62,13 @@ const PUSH_BACK: Record<Tier, number> = { easy: 0.0065, medium: 0.0045, hard: 0.
 function buildConfig(wave: number, tier: Tier, lang: LanguageId, crossover: number): WaveConfig {
   const n = Math.max(1, wave)
   const ln = Math.log(n)
-  // Thai words carry more code points (marks) per visual letter.
-  const langScale = lang === 'th' ? 1.35 : 1
-  const [minBase, maxBase] = BASE_LEN[tier]
-  const minLen = Math.round(minBase * langScale)
+  // Word length belongs to the language ("English" vs "English advanced"), never the tier.
+  const language = getLanguage(lang)
+  const [minLen, maxBase] = language.len
+  // Thai words carry more code points (marks) per visual letter, so they stretch a little faster.
+  const growth = language.script === 'thai' ? 1.6 * 1.35 : 1.6
   // log growth with a soft start, so words never lengthen faster than the pace rises
-  const maxLenExact = (maxBase + 1.6 * Math.log(1 + (n - 1) / 3)) * langScale
+  const maxLenExact = maxBase + growth * Math.log(1 + (n - 1) / 3)
   const maxLen = Math.round(maxLenExact)
 
   const demandWpm = TARGET_WPM[tier] * 2 ** ((n - crossover) / DOUBLING_WAVES)

@@ -166,25 +166,60 @@ export const error = style({
 })
 
 export const avatar = style({
-  width: 22,
-  height: 22,
+  width: 26,
+  height: 26,
+  flexShrink: 0,
+  display: 'inline-grid',
+  placeItems: 'center',
   borderRadius: '50%',
-  objectFit: 'cover',
-  border: `1px solid ${tone.rule}`,
-  filter: 'grayscale(.35) contrast(1.05)',
+  color: vars.color.ink,
+  background: tone.wash,
+  border: `1px solid ${tone.ruleStrong}`,
+  overflow: 'hidden',
+  fontFamily: vars.font.display,
+  fontSize: 12,
+  fontWeight: 600,
 })
 
-export const initials = style([
-  avatar,
-  {
-    display: 'inline-grid',
-    placeItems: 'center',
-    fontFamily: vars.font.display,
-    fontSize: 11,
-    fontWeight: 600,
-    background: tone.wash,
-  },
-])
+export const avatarImg = style({ width: '100%', height: '100%', minWidth: 0, display: 'block', objectFit: 'cover', pointerEvents: 'none' })
+
+export const pickerGrid = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+  gap: 6,
+  width: 264,
+  maxWidth: '100%',
+})
+
+export const fileInput = style({ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' })
+
+export const uploadLink = style({
+  position: 'relative',
+  alignSelf: 'flex-start',
+  fontSize: 13,
+  color: vars.color.muted,
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+  cursor: 'pointer',
+  ':hover': { color: vars.color.ink },
+  selectors: { '&:focus-within': { outline: `2px solid ${vars.color.accent}`, outlineOffset: 2 } },
+})
+
+export const pick = style({
+  appearance: 'none',
+  padding: 0,
+  overflow: 'hidden',
+  aspectRatio: '1',
+  cursor: 'pointer',
+  borderRadius: '50%',
+  color: vars.color.ink,
+  background: tone.wash,
+  border: `1.5px solid transparent`,
+  transition: 'transform .15s, border-color .15s, background .15s',
+  ':hover': { transform: 'translateY(-1px) rotate(-4deg)', background: tone.washStrong },
+  ':focus-visible': { outline: `2px solid ${vars.color.accent}`, outlineOffset: 2 },
+  selectors: { '&[data-on="true"]': { borderColor: vars.color.accent, background: tone.accentWash } },
+})
 
 export const menuHead = style({
   display: 'flex',

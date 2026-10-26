@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  documentId,
   getCountFromServer,
   getDoc,
   getDocs,
@@ -15,18 +16,19 @@ import {
 import { db } from '../../lib/firebase'
 import type { RunResult } from '../../game/modes/types'
 import type { LanguageId, Tier } from '../../game/words/languages'
+import { DATA_PREFIX } from '../auth/resizeAvatar'
 import { boardId, PERIODS, type Period } from './periods'
 
 export interface BoardUser {
   uid: string
   displayName: string | null
-  photoURL: string | null
+  avatar: string | null
 }
 
 export interface LeaderboardEntry {
   uid: string
   name: string
-  photoURL: string | null
+  avatar?: string | null
   score: number
   wpm: number
   accuracy: number
@@ -50,7 +52,7 @@ function entryFor(user: BoardUser, run: RunResult) {
   return {
     uid: user.uid,
     name: (user.displayName || 'anonymous typist').slice(0, 60),
-    photoURL: user.photoURL ?? null,
+    avatar: user.avatar ?? null,
     score: Math.round(run.score),
     wpm: Math.round(run.wpm * 10) / 10,
     accuracy: run.accuracy,
@@ -95,6 +97,23 @@ export async function fetchOwnEntry(board: string, uid: string): Promise<{ entry
   if (!snap.exists()) return null
   const entry = snap.data() as LeaderboardEntry
   return { entry, rank: await rankOf(board, entry.score) }
+}
+
+/** Uploaded profile pictures for these accounts, as data URLs. Firestore's `in` takes at most 30 ids. */
+export async function fetchAvatars(uids: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {}
+  const chunks: string[][] = []
+  for (let i = 0; i < uids.length; i += 30) chunks.push(uids.slice(i, i + 30))
+  await Promise.all(
+    chunks.map(async (ids) => {
+      const snap = await getDocs(query(collection(db, 'avatars'), where(documentId(), 'in', ids)))
+      for (const d of snap.docs) {
+        const png = d.data().png
+        if (typeof png === 'string') out[d.id] = DATA_PREFIX + png
+      }
+    }),
+  )
+  return out
 }
 
 async function rankOf(board: string, score: number): Promise<number> {

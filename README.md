@@ -77,7 +77,7 @@ src/
   features/     auth, leaderboard, results, streak, progress, profile, settings
   theme/        palettes, theme contract, global styles
   ui/           Radix-based primitives
-public/words/   word lists per language and tier
+public/words/   one word list per language
 ```
 
 ### Adding a game mode
@@ -90,6 +90,17 @@ Each mode also prints its own shareable result card: `details(state)` returns wh
 
 Guests can play freely. Runs are kept locally and queued; when the player signs in, the queue is uploaded, the best run per board is posted to the standings and the guest streak is merged in. A signed-in save that fails is queued the same way and retried on the next sign-in.
 
+### Profile faces
+
+Players pick a built-in face or upload their own picture.
+
+- **Built-in:** drop 128×128 `.png` files into `src/assets/avatars/`. They appear in the picker automatically (see `src/features/auth/avatars.ts`). The file name is the id stored on the account and the standings, so use lowercase letters, digits and hyphens (`sleepy-cat.png`), avoid `custom`, and don't rename a file once players have picked it.
+- **Uploaded:** the browser centre-crops the picture to a square and resizes it to 128×128 (`resizeAvatar.ts`), then stores it as a small PNG in `avatars/{uid}`. The account and its standings entries just say `custom`; standings pages fetch the pictures for the rows they show, 30 at a time, and cache them.
+
+Until the folder has files, accounts without an upload show the first letter of their name.
+
 ### Adding a language
 
-Add an entry to `LANGUAGES` in `src/game/words/languages.ts`, word lists at `public/words/{id}/{easy,medium,hard,expert}.json`, and the code to `validLang` in `firestore.rules`.
+A language is a word list plus the length of word it starts with. Add an entry to `LANGUAGES` in `src/game/words/languages.ts` (`len` is the shortest and longest word of wave 1; `words` is a file under `public/words/`, or a generator), add `public/words/{id}.json`, and add the id to `validLang` in `firestore.rules`. Use lowercase letters and hyphens in ids.
+
+Difficulty (easy–expert) never picks the words. It sets the pace, how crowded the page is, how much a mistype costs and how far a key pushes a word back. What you type comes from the language: `English` is common words, `English intermediate` and `English advanced` get longer, and the punctuation, number and code lists (`English punctuation`, `Numbers`, `JavaScript`, `Python`, `Thai punctuation`) are languages of their own.

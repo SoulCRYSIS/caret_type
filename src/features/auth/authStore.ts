@@ -3,6 +3,8 @@ import type { User } from 'firebase/auth'
 import { isFirebaseConfigured } from '../../lib/firebaseConfig'
 import { useProgress } from '../progress/progressStore'
 import { pickSettings, useSettings } from '../settings/settingsStore'
+import { setCustomAvatar, useAvatarCache } from './avatarCache'
+import { CUSTOM_AVATAR, isAvatarId } from './avatars'
 import type { ProviderId } from './providers'
 
 export type AuthStatus = 'loading' | 'guest' | 'user' | 'unavailable'
@@ -10,7 +12,8 @@ export type AuthStatus = 'loading' | 'guest' | 'user' | 'unavailable'
 export interface AuthUser {
   uid: string
   displayName: string | null
-  photoURL: string | null
+  /** Id of the chosen face (see avatars.ts); null until the account has picked one. */
+  avatar: string | null
 }
 
 interface AuthStore {
@@ -83,7 +86,7 @@ export function initAuth(): void {
         }
         useAuth.setState({
           status: 'user',
-          user: { uid: u.uid, displayName: u.displayName, photoURL: u.photoURL },
+          user: { uid: u.uid, displayName: u.displayName, avatar: null },
           unverifiedEmail: svc.isVerified(u) ? null : u.email,
           syncing: true,
           error: null,
@@ -100,14 +103,16 @@ export function initAuth(): void {
 async function sync(svc: Service, u: User) {
   useAuth.setState({ syncing: true })
   try {
-    const { settings, named } = await svc.syncOnSignIn(u, useSettings.getState())
+    const { settings, named, avatar, customAvatar } = await svc.syncOnSignIn(u, useSettings.getState())
+    if (customAvatar) setCustomAvatar(u.uid, customAvatar)
     if (settings) {
       applyingRemote = true
       useSettings.getState().set(settings)
       applyingRemote = false
     }
     startSettingsSync(u.uid)
-    useAuth.setState({ syncing: false, needsName: !named })
+    const cur = useAuth.getState().user
+    useAuth.setState({ syncing: false, needsName: !named, ...(cur?.uid === u.uid ? { user: { ...cur, avatar } } : {}) })
   } catch (err) {
     console.error(err)
     useAuth.setState({ syncing: false, error: 'Could not sync your progress. It is kept on this device.' })
@@ -198,22 +203,28 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   }
 }
 
-/** Returns an error message, or null once the new name is saved. */
-export async function changeName(raw: string): Promise<string | null> {
+/** Returns an error message, or null once the name and face are saved. */
+export async function changeProfile(raw: string, avatar: string | null, uploadedPng: string | null = null): Promise<string | null> {
   const name = raw.trim().replace(/\s+/g, ' ')
   if (!name) return 'Pick a name to show on the standings.'
   if (name.length > NAME_MAX) return `Keep it under ${NAME_MAX} characters.`
   const u = firebaseUser
   const user = useAuth.getState().user
   if (!u || !user) return 'Sign in first.'
+  if (avatar !== null && !isAvatarId(avatar)) return 'Pick a face.'
+  if (avatar === CUSTOM_AVATAR && !uploadedPng && !useAvatarCache.getState().urls[user.uid]) return 'Upload a picture first.'
   try {
     const svc = await loadService()
-    await svc.setDisplayName(u, name)
-    useAuth.setState({ user: { ...user, displayName: name }, needsName: false })
+    // saving without choosing a new picture keeps the one already on the account
+    await svc.setProfile(u, name, avatar, uploadedPng)
+    if (avatar === CUSTOM_AVATAR) {
+      if (uploadedPng) setCustomAvatar(user.uid, uploadedPng)
+    } else if (avatar) setCustomAvatar(user.uid, null)
+    useAuth.setState({ user: { ...user, displayName: name, avatar: avatar ?? user.avatar }, needsName: false })
     return null
   } catch (err) {
     console.error(err)
-    return authError(err, "Couldn't save your name. Please try again.")
+    return authError(err, "Couldn't save your profile. Please try again.")
   }
 }
 
