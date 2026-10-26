@@ -11,6 +11,9 @@ export interface Settings {
   customPalette: PaletteColors
   sound: boolean
   volume: number
+  /** Background bed, separate from the effect bus. */
+  music: boolean
+  musicVolume: number
   shake: boolean
   particles: boolean
 }
@@ -23,6 +26,8 @@ export const SYNCED_SETTING_KEYS = [
   'customPalette',
   'sound',
   'volume',
+  'music',
+  'musicVolume',
   'shake',
   'particles',
 ] as const satisfies readonly (keyof Settings)[]
@@ -35,6 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
   customPalette: DEFAULT_CUSTOM,
   sound: true,
   volume: 0.6,
+  music: true,
+  musicVolume: 0.5,
   shake: true,
   particles: true,
 }

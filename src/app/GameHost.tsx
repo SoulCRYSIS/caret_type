@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { isUiTarget, normalizeKey } from '../game/engine/input'
 import { GameSession } from '../game/engine/session'
+import { music } from '../game/juice/music'
 import { synth } from '../game/juice/juice'
 import { getMode } from '../game/modes/registry'
 import type { AnyGameMode, RunResult } from '../game/modes/types'
@@ -93,6 +94,8 @@ export function GameHost() {
   const tier = useSettings((s) => s.tier)
   const sound = useSettings((s) => s.sound)
   const volume = useSettings((s) => s.volume)
+  const musicOn = useSettings((s) => s.music)
+  const musicVolume = useSettings((s) => s.musicVolume)
   const shake = useSettings((s) => s.shake)
   const particles = useSettings((s) => s.particles)
   const phase = useGameUi((s) => s.phase)
@@ -131,8 +134,9 @@ export function GameHost() {
     if (!words || !stageRef.current || !shakeRef.current || !canvasRef.current) return
     endSession()
     ;(document.activeElement as HTMLElement | null)?.blur?.()
-    synth.unlock()
-    const { sound, volume, shake, particles } = useSettings.getState()
+    const settings = useSettings.getState()
+    if (settings.sound || settings.music) synth.unlock()
+    const { sound, volume, shake, particles } = settings
     const mode = getMode(modeId)
     const s = new GameSession({
       mode,
@@ -183,8 +187,18 @@ export function GameHost() {
     synth.setVolume(volume)
   }, [sound, volume, shake, particles, session])
 
+  useEffect(() => {
+    music.enabled = musicOn
+    music.setVolume(musicVolume)
+    const inRun = modeId === 'ink-invaders' && phase !== 'idle'
+    if (!inRun || !musicOn) music.stop()
+    else if (phase === 'paused') music.quiet()
+    else music.play()
+  }, [musicOn, musicVolume, phase, modeId])
+
   useEffect(() => () => {
     sessionRef.current?.destroy()
+    music.stop()
     useGameUi.getState().setPhase('idle')
   }, [])
 

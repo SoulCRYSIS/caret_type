@@ -11,7 +11,6 @@ A minimalist, gamified typing game. Words drift down the page as ink-stamped ene
 ```sh
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest
 npm run build      # type-check + production build into dist/
 ```
 

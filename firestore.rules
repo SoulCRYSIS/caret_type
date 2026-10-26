@@ -97,7 +97,7 @@ service cloud.firestore {
         && isNum(d.wpm, 0, 300)
         && isNum(d.accuracy, 0, 1)
         && isNum(d.durationMs, 0, 21600000)
-        && d.score <= d.chars * 120 + 100 * d.wave * (d.wave + 1)
+        && d.score <= d.chars * 200 + 100 * d.wave * (d.wave + 1)
         && d.wpm * d.durationMs <= d.chars * 12600 + 60000;
     }
 

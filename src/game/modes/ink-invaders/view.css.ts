@@ -212,6 +212,7 @@ const inkFrom = createVar()
 const inkOver = createVar()
 const inkSpin = createVar()
 const hotScale = createVar()
+const splashSize = createVar()
 
 const inkSpread = keyframes({
   '0%': { transform: `scale(${inkFrom}) rotate(calc(${inkSpin} * -1))`, opacity: 0.55 },
@@ -265,6 +266,19 @@ function splatter(x: string, y: string) {
   })
 }
 
+/** `&[data-tier="from"]` through `to`, joined for a selector list. */
+function tiers(from: number, to: number): string {
+  return Array.from({ length: to - from + 1 }, (_, i) => `&[data-tier="${from + i}"]`).join(', ')
+}
+
+function upRing(from: number, to: number): string {
+  return Array.from({ length: to - from + 1 }, (_, i) => `&[data-dir="up"][data-tier="${from + i}"]::before`).join(', ')
+}
+
+function onSeal(from: number, to = from): string {
+  return Array.from({ length: to - from + 1 }, (_, i) => `${comboSeal}[data-tier="${from + i}"] &`).join(', ')
+}
+
 const ring = {
   content: '""',
   position: 'absolute' as const,
@@ -301,11 +315,13 @@ export const comboSeal = style({
     '&[data-tier="4"]': { vars: { [stampFrom]: '1.58', [stampSpin]: '-10deg' } },
     '&[data-tier="5"]': { vars: { [stampFrom]: '1.72', [stampSpin]: '-12deg' } },
     '&[data-tier="6"]': { vars: { [stampFrom]: '1.88', [stampSpin]: '-14deg' } },
-    '&[data-tier="4"], &[data-tier="5"], &[data-tier="6"]': { color: vars.color.accent },
+    '&[data-tier="7"]': { vars: { [stampFrom]: '2.02', [stampSpin]: '-16deg' } },
+    '&[data-tier="8"]': { vars: { [stampFrom]: '2.14', [stampSpin]: '-17deg' } },
+    '&[data-tier="9"]': { vars: { [stampFrom]: '2.26', [stampSpin]: '-18deg' } },
+    '&[data-tier="10"]': { vars: { [stampFrom]: '2.4', [stampSpin]: '-20deg' } },
+    [tiers(4, 10)]: { color: vars.color.accent },
     '&[data-dir="up"]::after': { animation: `${shock} .62s ${ease.out} both` },
-    '&[data-dir="up"][data-tier="5"]::before, &[data-dir="up"][data-tier="6"]::before': {
-      animation: `${shock} .78s .12s ${ease.out} both`,
-    },
+    [upRing(5, 10)]: { animation: `${shock} .78s .12s ${ease.out} both` },
     [`${comboBlock}[data-reduced="true"] &::before, ${comboBlock}[data-reduced="true"] &::after`]: { animation: 'none' },
   },
 })
@@ -347,6 +363,18 @@ export const comboInk = style({
       scale: '1.06',
       vars: { [inkBreathe]: '0.095', [wag]: '4deg', [inkFrom]: '0.2', [inkOver]: '1.26', [inkSpin]: '11deg' },
     },
+    [onSeal(7, 8)]: {
+      scale: '1.12',
+      vars: { [inkBreathe]: '0.105', [wag]: '4.4deg', [inkFrom]: '0.18', [inkOver]: '1.3', [inkSpin]: '12deg' },
+    },
+    [`${comboSeal}[data-tier="9"] &`]: {
+      scale: '1.18',
+      vars: { [inkBreathe]: '0.115', [wag]: '4.8deg', [inkFrom]: '0.16', [inkOver]: '1.34', [inkSpin]: '13deg' },
+    },
+    [`${comboSeal}[data-tier="10"] &`]: {
+      scale: '1.24',
+      vars: { [inkBreathe]: '0.13', [wag]: '5.2deg', [inkFrom]: '0.14', [inkOver]: '1.38', [inkSpin]: '14deg' },
+    },
   },
 })
 
@@ -362,7 +390,7 @@ export const comboInkUp = style({
   selectors: {
     [`${comboSeal}[data-tier="4"] &`]: { animationDuration: '.52s, 2.8s', animationDelay: '0s, .52s' },
     [`${comboSeal}[data-tier="5"] &`]: { animationDuration: '.56s, 2.3s', animationDelay: '0s, .56s' },
-    [`${comboSeal}[data-tier="6"] &`]: { animationDuration: '.62s, 1.7s', animationDelay: '0s, .62s' },
+    [onSeal(6, 10)]: { animationDuration: '.62s, 1.7s', animationDelay: '0s, .62s' },
     ...inkMotionOff.selectors,
   },
   '@media': inkMotionOff['@media'],
@@ -372,7 +400,7 @@ export const comboInkDown = style({
   animation: `${inkShrink} .42s ${ease.out} both, ${inkFlow} 3.4s .42s ease-in-out infinite`,
   selectors: {
     [`${comboSeal}[data-tier="5"] &`]: { animationDuration: '.42s, 2.3s' },
-    [`${comboSeal}[data-tier="6"] &`]: { animationDuration: '.42s, 1.7s' },
+    [onSeal(6, 10)]: { animationDuration: '.42s, 1.7s' },
     ...inkMotionOff.selectors,
   },
   '@media': inkMotionOff['@media'],
@@ -407,7 +435,8 @@ export const mult = style({
   selectors: {
     [`${comboSeal}[data-tier="1"] &`]: { color: vars.color.muted },
     [`${comboSeal}[data-tier="5"] &`]: { fontSize: 34 },
-    [`${comboSeal}[data-tier="6"] &`]: { fontSize: 36 },
+    [onSeal(6, 9)]: { fontSize: 36 },
+    [`${comboSeal}[data-tier="10"] &`]: { fontSize: 30 },
   },
 })
 
@@ -415,7 +444,8 @@ export const multHot = style({
   vars: { [hotScale]: '1.045' },
   animation: `${multHotKf} 1.8s .62s ease-in-out infinite`,
   selectors: {
-    [`${comboSeal}[data-tier="6"] &`]: { vars: { [hotScale]: '1.08' }, animationDuration: '1.15s' },
+    [onSeal(6, 7)]: { vars: { [hotScale]: '1.08' }, animationDuration: '1.15s' },
+    [onSeal(8, 10)]: { vars: { [hotScale]: '1.12' }, animationDuration: '.9s' },
     ...inkMotionOff.selectors,
   },
   '@media': inkMotionOff['@media'],
@@ -433,7 +463,7 @@ export const multStamp = style({
   animation: `${multStampKf} .5s ${ease.out} both`,
   selectors: {
     [`${comboSeal}[data-tier="5"] &`]: { animationDuration: '.56s' },
-    [`${comboSeal}[data-tier="6"] &`]: { animationDuration: '.62s' },
+    [onSeal(6, 10)]: { animationDuration: '.62s' },
     ...inkMotionOff.selectors,
   },
   '@media': inkMotionOff['@media'],
@@ -546,6 +576,161 @@ export const notebookRule = style({
   width: 0,
   borderLeft: `1.5px solid color-mix(in oklab, ${vars.color.accent} 26%, transparent)`,
   zIndex: 0,
+})
+
+/* --- combo tier splash: ink bursts from the center, then the number is left in the pool --- */
+
+const streakFly = keyframes({
+  '0%': {
+    opacity: 0,
+    transform: 'translate(-50%, -100%) translate(var(--x), var(--y)) rotate(var(--r)) scale(.4, .06)',
+  },
+  '16%': {
+    opacity: 'var(--o)',
+    transform:
+      'translate(-50%, -100%) translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--sx), calc(var(--sy) * var(--spread) * 1.14))',
+  },
+  '40%': {
+    opacity: 'var(--o)',
+    transform: 'translate(-50%, -100%) translate(var(--x), var(--y)) rotate(var(--r)) scale(var(--sx), calc(var(--sy) * var(--spread)))',
+  },
+  '100%': {
+    opacity: 0,
+    transform:
+      'translate(-50%, -100%) translate(calc(var(--x) * 1.8), calc(var(--y) * 1.8)) rotate(var(--r)) scale(calc(var(--sx) * .55), calc(var(--sy) * var(--spread) * .7))',
+  },
+})
+
+const beadFly = keyframes({
+  '0%': { opacity: 0, transform: 'translate(-50%, -50%) translate(0px, 0px) rotate(var(--r)) scale(.2)' },
+  '24%': {
+    opacity: 'var(--o)',
+    transform:
+      'translate(-50%, -50%) translate(calc(var(--x) * var(--spread) * .92), calc(var(--y) * var(--spread) * .92)) rotate(var(--r)) scale(var(--sx), var(--sy))',
+  },
+  '58%': {
+    opacity: 'var(--o)',
+    transform: 'translate(-50%, -50%) translate(calc(var(--x) * var(--spread)), calc(var(--y) * var(--spread))) rotate(var(--r)) scale(var(--sx), var(--sy))',
+  },
+  '100%': {
+    opacity: 0,
+    transform:
+      'translate(-50%, -50%) translate(calc(var(--x) * var(--spread) * 1.2), calc(var(--y) * var(--spread) * 1.2)) rotate(var(--r)) scale(calc(var(--sx) * .45))',
+  },
+})
+
+const poolIn = keyframes({
+  '0%': { transform: 'translate(-50%, -50%) scale(0.15) rotate(-14deg)', opacity: 0 },
+  '14%': { transform: 'translate(-50%, -50%) scale(1.22) rotate(5deg)', opacity: 1 },
+  '30%': { transform: 'translate(-50%, -50%) scale(0.94) rotate(-2deg)', opacity: 1 },
+  '68%': { transform: 'translate(-50%, -50%) scale(1) rotate(0deg)', opacity: 1 },
+  '100%': { transform: 'translate(-50%, -50%) scale(0.92) rotate(0deg)', opacity: 0 },
+})
+
+const figureIn = keyframes({
+  '0%': { opacity: 0, transform: 'translate(-50%, -46%) scale(0.55) rotate(-7deg)' },
+  '20%': { opacity: 0, transform: 'translate(-50%, -50%) scale(0.72) rotate(-3deg)' },
+  '34%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1.06) rotate(1deg)' },
+  '48%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
+  '74%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(0deg)' },
+  '100%': { opacity: 0, transform: 'translate(-50%, -54%) scale(1.03) rotate(0deg)' },
+})
+
+const figureStill = keyframes({
+  '0%': { opacity: 0, transform: 'translate(-50%, -50%)' },
+  '20%': { opacity: 1 },
+  '62%': { opacity: 1 },
+  '100%': { opacity: 0, transform: 'translate(-50%, -50%)' },
+})
+
+const tierAccent = {
+  [tiers(4, 10)]: { color: vars.color.accent },
+}
+
+export const splashField = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: 1,
+  pointerEvents: 'none',
+  color: vars.color.ink,
+  selectors: tierAccent,
+  '@media': { '(max-width: 720px)': { scale: '0.72' } },
+})
+
+const piece = {
+  position: 'absolute' as const,
+  left: '50%',
+  top: '44%',
+  display: 'block',
+  pointerEvents: 'none' as const,
+  fill: 'currentColor',
+  filter: 'url(#ink-rough)',
+}
+
+export const splashBlob = style({
+  display: 'block',
+  width: '100%',
+  height: '100%',
+  overflow: 'visible',
+})
+
+export const splashStreak = style({
+  ...piece,
+  width: 32,
+  height: 150,
+  transformOrigin: 'center bottom',
+  animation: `${streakFly} .96s linear both`,
+})
+
+export const splashBead = style({
+  ...piece,
+  width: 22,
+  height: 22,
+  animation: `${beadFly} .72s linear both`,
+})
+
+export const splashPool = style({
+  ...piece,
+  width: 176,
+  height: 132,
+  animation: `${poolIn} 1.25s linear both`,
+  selectors: {
+    [`${splashField}[data-tier="3"] &, ${splashField}[data-tier="4"] &`]: { width: 200, height: 148 },
+    [`${splashField}[data-tier="5"] &, ${splashField}[data-tier="6"] &`]: { width: 224, height: 164 },
+    [`${splashField}[data-tier="7"] &, ${splashField}[data-tier="8"] &`]: { width: 248, height: 180 },
+    [`${splashField}[data-tier="9"] &, ${splashField}[data-tier="10"] &`]: { width: 276, height: 198 },
+  },
+})
+
+export const splashFigure = style({
+  position: 'absolute',
+  left: '50%',
+  top: '44%',
+  zIndex: 4,
+  pointerEvents: 'none',
+  fontFamily: vars.font.display,
+  fontStyle: 'italic',
+  fontWeight: 600,
+  fontSize: splashSize,
+  lineHeight: 0.8,
+  letterSpacing: '-0.045em',
+  whiteSpace: 'nowrap',
+  color: vars.color.paper,
+  filter: 'url(#ink-rough)',
+  animation: `${figureIn} 1.25s linear both`,
+  vars: { [splashSize]: '76px' },
+  selectors: {
+    '&[data-tier="3"], &[data-tier="4"]': { vars: { [splashSize]: '88px' } },
+    '&[data-tier="5"], &[data-tier="6"]': { vars: { [splashSize]: '98px' } },
+    '&[data-tier="7"], &[data-tier="8"]': { vars: { [splashSize]: '108px' } },
+    '&[data-tier="9"], &[data-tier="10"]': { vars: { [splashSize]: '120px' } },
+    '&[data-reduced="true"]': { animation: `${figureStill} .7s ease-out both`, color: vars.color.ink },
+    '&[data-tier="4"][data-reduced="true"], &[data-tier="5"][data-reduced="true"], &[data-tier="6"][data-reduced="true"], &[data-tier="7"][data-reduced="true"], &[data-tier="8"][data-reduced="true"], &[data-tier="9"][data-reduced="true"], &[data-tier="10"][data-reduced="true"]': { color: vars.color.accent },
+  },
+  '@media': {
+    '(prefers-reduced-motion: reduce)': { animation: `${figureStill} .7s ease-out both` },
+    '(max-width: 720px)': { scale: '0.72' },
+  },
 })
 
 /* --- banner --- */

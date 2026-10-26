@@ -1,6 +1,6 @@
-/** How hard the game hits back at each combo multiplier (×1 … ×6). Every field grows with the tier. */
+/** How hard the game hits back at each combo multiplier (×1 … ×10). Every field grows with the tier. */
 export interface ComboPower {
-  /** 0 at ×1, 5 at ×6. */
+  /** 0 at ×1, 9 at ×10. */
   level: number
   /** Multiplies how many ink drops a key or a kill throws. */
   particles: number
@@ -20,14 +20,16 @@ export interface ComboPower {
 
 export function comboPower(mult: number): ComboPower {
   const level = Math.max(0, mult - 1)
+  // ×1–×6 keep their slope. Past that the page is already shaking, so each new tier adds a shorter step.
+  const t = level <= 5 ? level : 5 + (level - 5) * 0.45
   return {
     level,
-    particles: 1 + level * 0.4,
-    force: 1 + level * 0.13,
-    shake: 1 + level * 0.22,
-    hitstop: level * 9,
-    rings: Math.max(0, level - 1),
-    keyShake: level * 0.012,
-    thump: level === 0 ? 0 : Math.min(1, 0.2 + level * 0.16),
+    particles: 1 + t * 0.4,
+    force: 1 + t * 0.13,
+    shake: 1 + t * 0.22,
+    hitstop: Math.round(t * 9),
+    rings: Math.max(0, Math.round(t) - 1),
+    keyShake: Math.min(0.072, t * 0.012),
+    thump: t === 0 ? 0 : Math.min(1, 0.2 + t * 0.16),
   }
 }

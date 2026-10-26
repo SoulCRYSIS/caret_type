@@ -128,3 +128,7 @@ export const range = style({
   width: 200,
   accentColor: vars.color.accent,
 })
+
+export const rangeName = style({
+  width: 64,
+})

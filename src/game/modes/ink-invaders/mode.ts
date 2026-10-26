@@ -123,6 +123,7 @@ function removeEnemy(s: InkState, e: Enemy) {
 function breakCombo(s: InkState, next: number) {
   const lost = s.combo - next
   if (lost >= 5) s.comboBreak = { id: ++s.fxId, value: -lost }
+  if (multiplier(next) < multiplier(s.combo)) s.comboCallout = null
   s.combo = next
 }
 
@@ -167,6 +168,17 @@ function kill(s: InkState, e: Enemy, ctx: ModeContext) {
   }
 }
 
+/** A tier-up throws a sheet of ink across the middle of the page. */
+function splashCombo(ctx: ModeContext, mult: number, ink: string, accent: string) {
+  const { juice } = ctx
+  const x = ctx.width / 2
+  const y = ctx.height * 0.44
+  const color = mult >= 4 ? accent : ink
+  juice.splatter(x, y, { color, count: 22 + mult * 7, power: 520 + mult * 60, stains: false, size: 1.8, linger: 1.3 })
+  juice.splatter(x, y, { color: ink, count: 8 + mult * 2, power: 240 + mult * 28, stains: false, size: 2.8, linger: 1.15 })
+  juice.splatter(x, y, { color, count: 6 + mult, power: 150 + mult * 12, angle: Math.PI / 2, spread: 1.05, stains: false, size: 3.3, linger: 1.35 })
+}
+
 function hit(s: InkState, e: Enemy, ctx: ModeContext) {
   const { juice } = ctx
   const before = multiplier(s.combo)
@@ -198,12 +210,15 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
     // A new tier lands with a shockwave from the word, bigger every time.
     const burst = comboPower(after)
     juice.splatter(p.x + w / 2, p.y + (e.h || 40) / 2, { color: c.accent, count: 10 + burst.level * 8, power: 260 + burst.level * 50, stains: false })
-    for (let i = 0; i < Math.min(4, burst.level); i++) juice.particles.ring(p.x + w / 2, p.y + (e.h || 40) / 2, i % 2 ? c.ink : c.accent, 90 + i * 55, 3)
+    splashCombo(ctx, after, c.ink, c.accent)
+    const rings = Math.min(after >= 7 ? 6 : 4, burst.level)
+    for (let i = 0; i < rings; i++) juice.particles.ring(p.x + w / 2, p.y + (e.h || 40) / 2, i % 2 ? c.ink : c.accent, 90 + i * 55, 3)
     if (after >= 4) {
       juice.hitstop(50 + after * 10)
       juice.slowmo(0.55, 90 + after * 15, 160)
     }
-    if (after >= 6) juice.particles.stain(p.x + w / 2, p.y + (e.h || 40) / 2, 70, c.accent, 0.14, 12)
+    if (after >= 6) juice.particles.stain(p.x + w / 2, p.y + (e.h || 40) / 2, 70 + Math.max(0, after - 6) * 16, c.accent, 0.14, 12)
+    s.comboCallout = { id: ++s.fxId, mult: after }
   }
   if (e.matcher.done) kill(s, e, ctx)
 }
@@ -301,6 +316,7 @@ export const inkInvaders: GameMode<InkState, InkDetails> = {
       startedAt: Date.now(),
       endedAt: 0,
       banner: null,
+      comboCallout: null,
       comboBreak: null,
       scoreBump: 0,
       errorFlash: 0,

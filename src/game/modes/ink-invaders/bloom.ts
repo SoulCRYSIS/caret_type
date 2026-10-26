@@ -43,9 +43,9 @@ export class BloomRenderer {
     this.draw()
   }
 
-  /** 0 clear, 1…5 corresponds to ×2…×6. Keep the pigment flowing while a combo is active. */
+  /** 0 clear, 1…9 corresponds to ×2…×10. Keep the pigment flowing while a combo is active. */
   setLevel(level: number): void {
-    this.goal = Math.min(5, Math.max(0, level))
+    this.goal = Math.min(9, Math.max(0, level))
     if (this.opts.reduced) { this.cur = this.goal; this.draw(); return }
     if (!this.raf) {
       this.last = performance.now()

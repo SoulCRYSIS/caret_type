@@ -93,6 +93,8 @@ export interface InkState {
   endedAt: number
 
   banner: Banner | null
+  /** A tier just reached. The view stamps it in the center, then the animation fades it. */
+  comboCallout: { id: number; mult: number } | null
   comboBreak: { id: number; value: number } | null
   scoreBump: number
   errorFlash: number

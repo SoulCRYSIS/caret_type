@@ -33,7 +33,7 @@ export default function SettingsPage() {
             sound
           </Check>
           <label className={css.colorRow}>
-            <span>volume</span>
+            <span className={css.rangeName}>effects</span>
             <input
               className={css.range}
               type="range"
@@ -42,9 +42,28 @@ export default function SettingsPage() {
               step={0.05}
               value={s.volume}
               disabled={!s.sound}
+              aria-label="effects volume"
               onChange={(e) => s.set({ volume: Number(e.target.value) })}
             />
             <span>{Math.round(s.volume * 100)}</span>
+          </label>
+          <Check checked={s.music} onChange={(v) => s.set({ music: v })}>
+            music
+          </Check>
+          <label className={css.colorRow}>
+            <span className={css.rangeName}>music</span>
+            <input
+              className={css.range}
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={s.musicVolume}
+              disabled={!s.music}
+              aria-label="music volume"
+              onChange={(e) => s.set({ musicVolume: Number(e.target.value) })}
+            />
+            <span>{Math.round(s.musicVolume * 100)}</span>
           </label>
           <Check checked={s.shake} onChange={(v) => s.set({ shake: v })}>
             screen shake{reduced ? ' (off: your system prefers reduced motion)' : ''}

@@ -63,6 +63,10 @@ export interface SplatterOptions {
   /** Bias direction in radians; undefined means radial. */
   angle?: number
   spread?: number
+  /** Multiplies drop radius. */
+  size?: number
+  /** Multiplies how long a drop stays in the air. */
+  linger?: number
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
@@ -107,9 +111,9 @@ export class Particles {
         y,
         vx: Math.cos(a) * speed,
         vy: Math.sin(a) * speed - o.power * 0.25,
-        r: rand(1.2, 4.2) * (speed < o.power * 0.4 ? 1.4 : 1),
+        r: rand(1.2, 4.2) * (o.size ?? 1) * (speed < o.power * 0.4 ? 1.4 : 1),
         life: 0,
-        max: rand(0.35, 0.8),
+        max: rand(0.35, 0.8) * (o.linger ?? 1),
         color: o.color,
         stains: o.stains ?? true,
       })

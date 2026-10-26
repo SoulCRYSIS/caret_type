@@ -1,7 +1,7 @@
 import type { Tier } from '../../words/languages'
 
-/** Combo needed for ×1 … ×6; each step roughly doubles the one before. */
-export const COMBO_TIERS = [0, 20, 60, 120, 250, 500] as const
+/** Combo needed for ×1 … ×10. ×2–×6 keep the old steps; ×7–×10 climb to 3000. */
+export const COMBO_TIERS = [0, 20, 60, 120, 250, 500, 850, 1300, 2000, 3000] as const
 
 /** Combo lost on a mistype; harder tiers punish sloppiness more. A breach still clears it entirely. */
 export const MISS_COMBO_PENALTY: Record<Tier, number> = { easy: 5, medium: 10, hard: 20, expert: 30 }
@@ -19,7 +19,7 @@ export function tierProgress(combo: number): number {
   return (combo - lo) / (hi - lo)
 }
 
-/** ×1 … ×6 based on the running combo. */
+/** ×1 … ×10 based on the running combo. */
 export function multiplier(combo: number): number {
   let m = 1
   for (let i = 1; i < COMBO_TIERS.length; i++) if (combo >= COMBO_TIERS[i]) m = i + 1

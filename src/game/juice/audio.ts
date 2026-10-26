@@ -1,6 +1,8 @@
+import { music } from './music'
+
 /**
- * Procedural sound: typewriter clacks, ink splats and stamps, synthesized with Web Audio
- * so there are no audio assets to load.
+ * Procedural sound: typewriter clacks, ink splats and stamps, synthesized with Web Audio.
+ * The music bed uses the same context but its own gain, opened from {@link unlock}.
  */
 export class Synth {
   private ctx: AudioContext | null = null
@@ -14,9 +16,8 @@ export class Synth {
     if (this.master) this.master.gain.value = v * 0.7
   }
 
-  /** Must be called from a user gesture before sound can play. */
+  /** Must be called from a user gesture before sound or music can play. */
   unlock(): void {
-    if (!this.enabled) return
     if (!this.ctx) {
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (!Ctor) return
@@ -32,10 +33,12 @@ export class Synth {
       const data = this.noise.getChannelData(0)
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
     }
+    music.attach(this.ctx)
     if (this.ctx.state === 'suspended') void this.ctx.resume()
   }
 
   close(): void {
+    music.stop()
     void this.ctx?.close()
     this.ctx = null
     this.master = null
@@ -214,16 +217,17 @@ export class Synth {
 
   /**
    * The combo catches fire: a rolling whoosh, then brass stabs over a sub boom, like a boss
-   * walking on. `level` 1…4 is combo ×3…×6; every step is heavier, higher and longer.
+   * walking on. `level` 1…8 is combo ×3…×10; every step is heavier, higher and longer.
    */
   boss(level: number): void {
     const ctx = this.ready()
     if (!ctx) return
-    const k = Math.min(4, Math.max(1, Math.round(level)))
+    const k = Math.min(8, Math.max(1, Math.round(level)))
     const t = ctx.currentTime
     const root = 73.42 * 2 ** (((k - 1) * 2) / 12)
 
-    const whoosh = this.env(ctx, 0.2 + k * 0.05, 0.16, 0.5, t)
+    const loud = Math.min(k, 5)
+    const whoosh = this.env(ctx, 0.2 + loud * 0.05, 0.16, 0.5, t)
     const sweep = this.noiseBurst(ctx, 'bandpass', 260, 0.9, whoosh, t, 0.6)
     sweep.frequency.setValueAtTime(260, t)
     sweep.frequency.exponentialRampToValueAtTime(2400, t + 0.5)
@@ -234,13 +238,13 @@ export class Synth {
       { at: 0.52, m: 1.1225, len: 0.9 },
     ].slice(0, k >= 3 ? 3 : k)
     const open = 700 + k * 450
-    for (const h of hits) this.stab(ctx, t + h.at, root * h.m, h.len, 0.2 + k * 0.03, open)
+    for (const h of hits) this.stab(ctx, t + h.at, root * h.m, h.len, 0.2 + loud * 0.03, open)
 
     const boom = ctx.createOscillator()
     boom.type = 'sine'
     boom.frequency.setValueAtTime(95, t + 0.12)
     boom.frequency.exponentialRampToValueAtTime(30, t + 0.55)
-    boom.connect(this.env(ctx, 0.4 + k * 0.1, 0.004, 0.75, t + 0.12))
+    boom.connect(this.env(ctx, 0.4 + loud * 0.1, 0.004, 0.75, t + 0.12))
     boom.start(t + 0.12)
     boom.stop(t + 0.95)
 
@@ -270,6 +274,7 @@ export class Synth {
       this.noiseBurst(ctx, 'highpass', 3200, 0.5, this.env(ctx, 0.2, 0.004, 1.1, t + 0.52), t + 0.52, 0.6)
       this.stamp()
     }
+    if (k >= 6) this.stab(ctx, t + 0.72, root * 1.498, 0.5, 0.16, open)
   }
 
   /** Rising chime, e.g. streak extended or combo tier reached. */

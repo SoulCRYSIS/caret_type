@@ -8,7 +8,6 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run",
     "emulators": "npx -y firebase-tools@latest emulators:start --only auth,firestore --project demo-caret",
     "dev:emulated": "VITE_USE_EMULATORS=true vite"
   },
@@ -40,7 +39,6 @@
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.88.0",
     "typescript": "~6.0.3",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.5"
+    "vite": "^8.3.4"
   }
 }

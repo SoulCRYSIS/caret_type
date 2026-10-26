@@ -3,7 +3,7 @@ import type { Juice } from '../../juice/juice'
 import { BloomRenderer } from './bloom'
 import * as css from './view.css'
 
-/** Ink spreading in from the page edges. `level` is 0 (clear) to 5 (combo ×6). */
+/** Ink spreading in from the page edges. `level` is 0 (clear) to 9 (combo ×10). */
 export const BloomLayer = memo(function BloomLayer({ level, juice }: { level: number; juice: Juice }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const bloom = useRef<BloomRenderer | null>(null)
