@@ -105,7 +105,7 @@ service cloud.firestore {
 
     function isValidSettings(s) {
       return s is map
-        && s.keys().hasOnly(['modeId', 'language', 'tier', 'paletteId', 'customPalette', 'sound', 'volume', 'shake', 'particles'])
+        && s.keys().hasOnly(['modeId', 'language', 'tier', 'paletteId', 'customPalette', 'sound', 'volume', 'music', 'musicVolume', 'shake', 'particles'])
         && (!('modeId' in s) || validModeId(s.modeId))
         && (!('language' in s) || validLang(s.language))
         && (!('tier' in s) || validTier(s.tier))
@@ -119,6 +119,8 @@ service cloud.firestore {
               && isHexColor(s.customPalette.get('error', '#000000'))))
         && (!('sound' in s) || s.sound is bool)
         && (!('volume' in s) || isNum(s.volume, 0, 1))
+        && (!('music' in s) || s.music is bool)
+        && (!('musicVolume' in s) || isNum(s.musicVolume, 0, 1))
         && (!('shake' in s) || s.shake is bool)
         && (!('particles' in s) || s.particles is bool);
     }
