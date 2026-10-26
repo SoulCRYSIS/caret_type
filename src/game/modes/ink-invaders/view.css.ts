@@ -1,4 +1,4 @@
-import { globalStyle, keyframes, style } from '@vanilla-extract/css'
+import { createVar, globalStyle, keyframes, style } from '@vanilla-extract/css'
 import { ease, tone, vars } from '../../../theme/contract.css'
 
 export const root = style({
@@ -8,15 +8,13 @@ export const root = style({
   userSelect: 'none',
 })
 
-/* Flames climb the page edges once the combo is hot (drawn on a canvas, see FireLayer.tsx / flames.ts). */
-export const fire = style({
+/* Pigment collects at the corners; words and HUD stay above the wash. */
+export const bloom = style({
   position: 'absolute',
   inset: 0,
   width: '100%',
   height: '100%',
   pointerEvents: 'none',
-  /* A touch of blur turns the tongues into flame instead of paper cut-outs. */
-  filter: 'blur(1.4px)',
 })
 
 /* --- enemy stamp --- */
@@ -206,36 +204,252 @@ export const comboBlock = style({
   textAlign: 'right',
 })
 
-const wobble = keyframes({
-  '0%': { transform: 'scale(1.6) rotate(-8deg)' },
-  '40%': { transform: 'scale(.9) rotate(4deg)' },
-  '70%': { transform: 'scale(1.08) rotate(-2deg)' },
-  '100%': { transform: 'scale(1) rotate(0)' },
+const stampFrom = createVar()
+const stampSpin = createVar()
+const inkBreathe = createVar()
+const wag = createVar()
+const inkFrom = createVar()
+const inkOver = createVar()
+const inkSpin = createVar()
+const hotScale = createVar()
+
+const inkSpread = keyframes({
+  '0%': { transform: `scale(${inkFrom}) rotate(calc(${inkSpin} * -1))`, opacity: 0.55 },
+  '38%': { transform: `scale(${inkOver}) rotate(${inkSpin})`, opacity: 1 },
+  '64%': { transform: `scale(.93) rotate(calc(${inkSpin} * -.3))` },
+  '100%': { transform: 'scale(1) rotate(0deg)', opacity: 1 },
 })
 
+const inkShrink = keyframes({
+  '0%': { transform: 'scale(1.2) rotate(6deg)', opacity: 0.45 },
+  '46%': { transform: 'scale(.84) rotate(-5deg)', opacity: 1 },
+  '100%': { transform: 'scale(1) rotate(0deg)', opacity: 1 },
+})
+
+const inkFlow = keyframes({
+  '0%, 100%': { transform: `scale(1, 1) rotate(calc(${wag} * -1))` },
+  '33%': { transform: `scale(calc(1 + ${inkBreathe}), calc(1 - ${inkBreathe} * .7)) rotate(${wag})` },
+  '66%': { transform: `scale(calc(1 - ${inkBreathe} * .45), calc(1 + ${inkBreathe})) rotate(calc(${wag} * -.65))` },
+})
+
+const shock = keyframes({
+  '0%': { transform: 'scale(.55)', opacity: 0.7 },
+  '100%': { transform: 'scale(1.22)', opacity: 0 },
+})
+
+const multStampKf = keyframes({
+  '0%': { transform: `translateY(-10px) scale(${stampFrom}) rotate(${stampSpin})`, color: vars.color.ink },
+  '34%': { transform: `translateY(1px) scale(.9) rotate(calc(${stampSpin} * -.12))`, color: vars.color.ink },
+  '50%': { transform: `translateY(2px) scale(.88) rotate(calc(${stampSpin} * -.16))`, color: vars.color.paper },
+  '72%': { transform: `translateY(-1px) scale(1.06) rotate(calc(${stampSpin} * .08))`, color: vars.color.paper },
+  '100%': { transform: 'translateY(0) scale(1) rotate(0deg)', color: vars.color.paper },
+})
+
+const multDropKf = keyframes({
+  '0%': { transform: 'translateY(-2px) scale(1.16) rotate(7deg)' },
+  '36%': { transform: 'translateY(3px) scale(.8) rotate(-7deg)' },
+  '68%': { transform: 'translateY(0) scale(1.04) rotate(2deg)' },
+  '100%': { transform: 'translateY(0) scale(1) rotate(0deg)' },
+})
+
+const multHotKf = keyframes({
+  '0%, 100%': { transform: 'scale(1)' },
+  '50%': { transform: `scale(${hotScale})` },
+})
+
+function splatter(x: string, y: string) {
+  return keyframes({
+    '0%': { transform: `translate(${x}, ${y}) scale(.15)`, opacity: 0 },
+    '58%': { transform: 'translate(0, 0) scale(1.25)', opacity: 1 },
+    '100%': { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+  })
+}
+
+const ring = {
+  content: '""',
+  position: 'absolute' as const,
+  left: '50%',
+  top: '50%',
+  width: 62,
+  height: 62,
+  marginLeft: -31,
+  marginTop: -31,
+  borderRadius: '46% 54% 50% 50%',
+  border: '2px solid currentColor',
+  filter: 'url(#ink-rough)',
+  opacity: 0,
+  pointerEvents: 'none' as const,
+  zIndex: 0,
+}
+
+export const comboSeal = style({
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 96,
+  height: 64,
+  color: vars.color.ink,
+  vars: {
+    [stampFrom]: '1.34',
+    [stampSpin]: '-6deg',
+  },
+  '::before': ring,
+  '::after': ring,
+  selectors: {
+    '&[data-tier="3"]': { vars: { [stampFrom]: '1.46', [stampSpin]: '-8deg' } },
+    '&[data-tier="4"]': { vars: { [stampFrom]: '1.58', [stampSpin]: '-10deg' } },
+    '&[data-tier="5"]': { vars: { [stampFrom]: '1.72', [stampSpin]: '-12deg' } },
+    '&[data-tier="6"]': { vars: { [stampFrom]: '1.88', [stampSpin]: '-14deg' } },
+    '&[data-tier="4"], &[data-tier="5"], &[data-tier="6"]': { color: vars.color.accent },
+    '&[data-dir="up"]::after': { animation: `${shock} .62s ${ease.out} both` },
+    '&[data-dir="up"][data-tier="5"]::before, &[data-dir="up"][data-tier="6"]::before': {
+      animation: `${shock} .78s .12s ${ease.out} both`,
+    },
+    [`${comboBlock}[data-reduced="true"] &::before, ${comboBlock}[data-reduced="true"] &::after`]: { animation: 'none' },
+  },
+})
+
+globalStyle(`${comboSeal}[data-dir="up"]::before, ${comboSeal}[data-dir="up"]::after`, {
+  '@media': { '(prefers-reduced-motion: reduce)': { animation: 'none' } },
+})
+
+const inkVars = {
+  [inkBreathe]: '0.045',
+  [wag]: '1.8deg',
+  [inkFrom]: '0.4',
+  [inkOver]: '1.12',
+  [inkSpin]: '5deg',
+}
+
+export const comboInk = style({
+  position: 'absolute',
+  width: 120,
+  height: 88,
+  overflow: 'visible',
+  fill: 'currentColor',
+  pointerEvents: 'none',
+  filter: 'url(#ink-rough)',
+  vars: inkVars,
+  selectors: {
+    [`${comboSeal}[data-tier="1"] &`]: { display: 'none' },
+    [`${comboSeal}[data-tier="2"] &`]: { scale: '.68', opacity: 0.85 },
+    [`${comboSeal}[data-tier="3"] &`]: { scale: '.78' },
+    [`${comboSeal}[data-tier="4"] &`]: {
+      scale: '.88',
+      vars: { [inkBreathe]: '0.06', [wag]: '2.6deg', [inkFrom]: '0.32', [inkOver]: '1.16', [inkSpin]: '7deg' },
+    },
+    [`${comboSeal}[data-tier="5"] &`]: {
+      scale: '.96',
+      vars: { [inkBreathe]: '0.075', [wag]: '3.2deg', [inkFrom]: '0.26', [inkOver]: '1.2', [inkSpin]: '9deg' },
+    },
+    [`${comboSeal}[data-tier="6"] &`]: {
+      scale: '1.06',
+      vars: { [inkBreathe]: '0.095', [wag]: '4deg', [inkFrom]: '0.2', [inkOver]: '1.26', [inkSpin]: '11deg' },
+    },
+  },
+})
+
+const inkMotionOff = {
+  selectors: {
+    [`${comboBlock}[data-reduced="true"] &`]: { animation: 'none' },
+  },
+  '@media': { '(prefers-reduced-motion: reduce)': { animation: 'none' } },
+}
+
+export const comboInkUp = style({
+  animation: `${inkSpread} .5s ${ease.out} both, ${inkFlow} 3.4s .5s ease-in-out infinite`,
+  selectors: {
+    [`${comboSeal}[data-tier="4"] &`]: { animationDuration: '.52s, 2.8s', animationDelay: '0s, .52s' },
+    [`${comboSeal}[data-tier="5"] &`]: { animationDuration: '.56s, 2.3s', animationDelay: '0s, .56s' },
+    [`${comboSeal}[data-tier="6"] &`]: { animationDuration: '.62s, 1.7s', animationDelay: '0s, .62s' },
+    ...inkMotionOff.selectors,
+  },
+  '@media': inkMotionOff['@media'],
+})
+
+export const comboInkDown = style({
+  animation: `${inkShrink} .42s ${ease.out} both, ${inkFlow} 3.4s .42s ease-in-out infinite`,
+  selectors: {
+    [`${comboSeal}[data-tier="5"] &`]: { animationDuration: '.42s, 2.3s' },
+    [`${comboSeal}[data-tier="6"] &`]: { animationDuration: '.42s, 1.7s' },
+    ...inkMotionOff.selectors,
+  },
+  '@media': inkMotionOff['@media'],
+})
+
+function splatterStyle(x: string, y: string, delay: string) {
+  return style({
+    transformBox: 'fill-box',
+    transformOrigin: 'center',
+    animation: `${splatter(x, y)} .5s ${ease.out} ${delay} both`,
+    ...inkMotionOff,
+  })
+}
+
+export const splatterDrop = {
+  nw: splatterStyle('48px', '22px', '.02s'),
+  ne: splatterStyle('-40px', '25px', '.1s'),
+  se: splatterStyle('-43px', '-22px', '.06s'),
+  sw: splatterStyle('29px', '-33px', '.14s'),
+}
+
 export const mult = style({
-  display: 'inline-block',
-  transformOrigin: 'right center',
+  position: 'relative',
+  zIndex: 1,
   fontFamily: vars.font.display,
-  fontSize: 34,
+  fontSize: 30,
   fontWeight: 600,
   lineHeight: 1,
   fontVariantNumeric: 'tabular-nums',
-  color: vars.color.muted,
-  animation: `${wobble} .45s ${ease.out}`,
+  letterSpacing: '-0.04em',
+  color: vars.color.paper,
   selectors: {
-    '&[data-tier="2"]': { color: vars.color.ink },
-    '&[data-tier="3"]': { color: vars.color.accent },
-    '&[data-tier="4"]': { color: vars.color.accent, textShadow: `2px 2px 0 ${tone.accentWash}` },
-    '&[data-tier="5"]': { color: vars.color.accent, fontSize: 38, textShadow: `3px 3px 0 ${tone.accentWash}` },
-    '&[data-tier="6"]': { color: vars.color.accent, fontSize: 42, textShadow: `3px 3px 0 ${tone.accentWash}, -1px -1px 0 ${tone.accentWash}` },
+    [`${comboSeal}[data-tier="1"] &`]: { color: vars.color.muted },
+    [`${comboSeal}[data-tier="5"] &`]: { fontSize: 34 },
+    [`${comboSeal}[data-tier="6"] &`]: { fontSize: 36 },
   },
+})
+
+export const multHot = style({
+  vars: { [hotScale]: '1.045' },
+  animation: `${multHotKf} 1.8s .62s ease-in-out infinite`,
+  selectors: {
+    [`${comboSeal}[data-tier="6"] &`]: { vars: { [hotScale]: '1.08' }, animationDuration: '1.15s' },
+    ...inkMotionOff.selectors,
+  },
+  '@media': inkMotionOff['@media'],
+})
+
+const figure = {
+  display: 'block',
+  transformOrigin: '50% 55%',
+}
+
+export const multFigure = style(figure)
+
+export const multStamp = style({
+  ...figure,
+  animation: `${multStampKf} .5s ${ease.out} both`,
+  selectors: {
+    [`${comboSeal}[data-tier="5"] &`]: { animationDuration: '.56s' },
+    [`${comboSeal}[data-tier="6"] &`]: { animationDuration: '.62s' },
+    ...inkMotionOff.selectors,
+  },
+  '@media': inkMotionOff['@media'],
+})
+
+export const multDrop = style({
+  ...figure,
+  animation: `${multDropKf} .42s ${ease.out} both`,
+  ...inkMotionOff,
 })
 
 export const tierBar = style({
   display: 'block',
   width: 96,
   height: 3,
+  borderRadius: '45% 20% 35% 25%',
   marginLeft: 'auto',
   marginTop: 6,
   marginBottom: 4,

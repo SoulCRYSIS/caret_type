@@ -95,7 +95,6 @@ export interface InkState {
   banner: Banner | null
   comboBreak: { id: number; value: number } | null
   scoreBump: number
-  comboPulse: number
   errorFlash: number
   lifeLost: number
 

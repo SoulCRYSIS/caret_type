@@ -191,7 +191,6 @@ function hit(s: InkState, e: Enemy, ctx: ModeContext) {
   if (pw.keyShake) juice.trauma(pw.keyShake)
 
   if (after > before) {
-    s.comboPulse++
     // Once the page catches fire (×3+) the tier-up is a boss sting instead of a chime.
     if (after >= 3) juice.audio.boss(after - 2)
     else juice.audio.chime(after)
@@ -304,7 +303,6 @@ export const inkInvaders: GameMode<InkState, InkDetails> = {
       banner: null,
       comboBreak: null,
       scoreBump: 0,
-      comboPulse: 0,
       errorFlash: 0,
       lifeLost: 0,
       rootEl: null,

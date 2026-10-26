@@ -1,7 +1,7 @@
 import type { Tier } from '../../words/languages'
 
 /** Combo needed for ×1 … ×6; each step roughly doubles the one before. */
-export const COMBO_TIERS = [0, 5, 10, 15, 20, 25] as const
+export const COMBO_TIERS = [0, 20, 60, 120, 250, 500] as const
 
 /** Combo lost on a mistype; harder tiers punish sloppiness more. A breach still clears it entirely. */
 export const MISS_COMBO_PENALTY: Record<Tier, number> = { easy: 5, medium: 10, hard: 20, expert: 30 }

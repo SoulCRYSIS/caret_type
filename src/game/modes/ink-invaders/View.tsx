@@ -1,6 +1,6 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import type { ModeContext, ModeViewProps } from '../types'
-import { FireLayer } from './FireLayer'
+import { BloomLayer } from './BloomLayer'
 import { enemyPos, marginY } from './geometry'
 import { COMBO_TIERS, multiplier, tierProgress } from './scoring'
 import type { Banner, Enemy, InkState } from './state'
@@ -67,9 +67,39 @@ function BannerView({ banner }: { banner: Banner }) {
   )
 }
 
+function ComboSeal({ mult }: { mult: number }) {
+  const [stamp, setStamp] = useState({ mult, dir: 'same' as 'up' | 'down' | 'same' })
+  const dir = mult === stamp.mult ? stamp.dir : mult > stamp.mult ? 'up' : 'down'
+  if (mult !== stamp.mult) setStamp({ mult, dir })
+  const inkMotion = dir === 'up' ? css.comboInkUp : dir === 'down' ? css.comboInkDown : ''
+
+  return (
+    <span key={mult} className={css.comboSeal} data-tier={mult} data-dir={dir}>
+      <svg className={`${css.comboInk} ${inkMotion}`} viewBox="0 0 120 88" aria-hidden focusable="false">
+        <path d="M27 24C18 17 14 28 20 36C8 43 17 55 27 54C24 68 39 73 47 66C56 78 70 72 74 66C89 73 103 59 96 49C109 42 98 29 88 30C90 18 76 13 67 22C58 10 43 15 40 23C35 17 29 18 27 24Z" />
+        <path d="M29 32C38 22 53 24 62 27" fill="none" stroke="currentColor" strokeWidth="2" opacity=".15" />
+        <g className={dir === 'up' ? css.splatterDrop.nw : undefined}>
+          <ellipse cx="12" cy="22" rx="4" ry="3" transform="rotate(28 12 22)" />
+        </g>
+        <g className={dir === 'up' ? css.splatterDrop.se : undefined}>
+          <circle cx="103" cy="66" r="3.5" />
+        </g>
+        <g className={dir === 'up' ? css.splatterDrop.ne : undefined}>
+          <circle cx="100" cy="19" r="2" />
+        </g>
+        <g className={dir === 'up' ? css.splatterDrop.sw : undefined}>
+          <ellipse cx="31" cy="77" rx="2" ry="3" transform="rotate(-30 31 77)" />
+        </g>
+      </svg>
+      <span className={mult >= 5 ? `${css.mult} ${css.multHot}` : css.mult}>
+        <span className={`${css.multFigure} ${dir === 'up' ? css.multStamp : dir === 'down' ? css.multDrop : ''}`}>&times;{mult}</span>
+      </span>
+    </span>
+  )
+}
+
 export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
   const mult = multiplier(s.combo)
-  const comboScale = 1 + Math.min(s.combo, 150) / 360
 
   return (
     <div
@@ -78,7 +108,7 @@ export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
         s.rootEl = el
       }}
     >
-      <FireLayer level={s.phase === 'over' || s.phase === 'dying' ? 0 : Math.max(0, mult - 2)} juice={ctx.juice} />
+      <BloomLayer level={s.phase === 'over' || s.phase === 'dying' ? 0 : Math.max(0, mult - 1)} juice={ctx.juice} />
       <div className={css.notebookRule} />
 
       <div className={css.hud}>
@@ -103,11 +133,9 @@ export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
             ))}
           </div>
         </div>
-        <div className={css.comboBlock}>
+        <div className={css.comboBlock} data-reduced={ctx.juice.reducedMotion}>
           <span className={css.hudLabel}>combo</span>
-          <span key={`${mult}-${s.comboPulse}`} className={css.mult} data-tier={mult} style={{ scale: String(comboScale) }}>
-            &times;{mult}
-          </span>
+          <ComboSeal key={s.startedAt} mult={mult} />
           <span className={css.tierBar} aria-hidden>
             <span className={css.tierFill} style={{ transform: `scaleX(${tierProgress(s.combo)})` }} />
           </span>
