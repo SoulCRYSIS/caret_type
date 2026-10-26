@@ -25,6 +25,11 @@ interface AuthStore {
   needsName: boolean
   /** Email of a password account whose address isn't confirmed yet; its runs stay on this device until it is. */
   unverifiedEmail: string | null
+  /**
+   * A sign-in collided with an existing email. `password` means that account has a password;
+   * `any` means Firebase hid which method it uses. The next successful sign-in of this email connects them.
+   */
+  linkHint: { email: string; via: 'password' | 'any' } | null
 }
 
 export const useAuth = create<AuthStore>(() => ({
@@ -34,6 +39,7 @@ export const useAuth = create<AuthStore>(() => ({
   error: null,
   needsName: false,
   unverifiedEmail: null,
+  linkHint: null,
 }))
 
 export const NAME_MAX = 40
@@ -153,13 +159,23 @@ const AUTH_ERRORS: Record<string, string> = {
   'auth/too-many-requests': 'Too many tries. Wait a minute and try again.',
   'auth/network-request-failed': 'No connection. Check your network and try again.',
   'auth/operation-not-allowed': "This sign-in method isn't switched on yet. Try another one.",
-  'auth/account-exists-with-different-credential': 'That email already signed in another way. Use the method you used first.',
+  'auth/account-exists-with-different-credential': "That email already has an account. Sign in the way you usually do and we'll connect this one.",
   'auth/user-disabled': 'This account has been disabled.',
 }
 
 function authError(err: unknown, fallback: string): string {
   const code = (err as { code?: string } | null)?.code
   return (code && AUTH_ERRORS[code]) || fallback
+}
+
+/** Set when a sign-in should be joined onto an account that already uses this email. */
+function linkHintFrom(err: unknown): { email: string; via: 'password' | 'any' } | null {
+  const code = (err as { code?: string } | null)?.code
+  const email = (err as { email?: string } | null)?.email
+  if (!email) return null
+  if (code === 'caret/link-needs-password') return { email, via: 'password' }
+  if (code === 'caret/link-needs-sign-in') return { email, via: 'any' }
+  return null
 }
 
 export function clearAuthError(): void {
@@ -170,9 +186,15 @@ export async function signIn(provider: ProviderId): Promise<boolean> {
   useAuth.setState({ error: null })
   try {
     const svc = await loadService()
-    await svc.signInWith(provider)
-    return true
+    const signedIn = await svc.signInWith(provider)
+    if (signedIn) useAuth.setState({ linkHint: null })
+    return signedIn
   } catch (err) {
+    const hint = linkHintFrom(err)
+    if (hint) {
+      useAuth.setState({ error: null, linkHint: hint })
+      return false
+    }
     console.error(err)
     useAuth.setState({ error: authError(err, 'Sign-in failed. Please try again.') })
     return false
@@ -184,8 +206,14 @@ export async function signInWithEmail(email: string, password: string): Promise<
   try {
     const svc = await loadService()
     await svc.emailSignIn(email.trim(), password)
+    useAuth.setState({ linkHint: null })
     return true
   } catch (err) {
+    const hint = linkHintFrom(err)
+    if (hint) {
+      useAuth.setState({ error: null, linkHint: hint })
+      return false
+    }
     useAuth.setState({ error: authError(err, 'Sign-in failed. Please try again.') })
     return false
   }
@@ -195,9 +223,15 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   useAuth.setState({ error: null })
   try {
     const svc = await loadService()
-    await svc.emailSignUp(email.trim(), password)
-    return true
+    const created = await svc.emailSignUp(email.trim(), password)
+    if (created) useAuth.setState({ linkHint: null })
+    return created
   } catch (err) {
+    const hint = linkHintFrom(err)
+    if (hint) {
+      useAuth.setState({ error: null, linkHint: hint })
+      return false
+    }
     useAuth.setState({ error: authError(err, "Couldn't create the account. Please try again.") })
     return false
   }

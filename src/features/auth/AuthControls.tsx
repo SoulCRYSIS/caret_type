@@ -107,9 +107,9 @@ function AvatarPicker({
 
 type EmailView = 'signin' | 'signup' | 'reset'
 
-function EmailForm({ onBack }: { onBack: () => void }) {
+function EmailForm({ onBack, presetEmail }: { onBack: () => void; presetEmail?: string }) {
   const [view, setView] = useState<EmailView>('signin')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(presetEmail ?? '')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
@@ -137,7 +137,10 @@ function EmailForm({ onBack }: { onBack: () => void }) {
 
   return (
     <form className={css.form} onSubmit={submit}>
-      <span className={css.formTitle}>{{ signin: 'sign in with email', signup: 'make an account', reset: 'reset your password' }[view]}</span>
+      <span className={css.formTitle}>
+        {presetEmail && view === 'signin' ? 'connect this sign-in' : { signin: 'sign in with email', signup: 'make an account', reset: 'reset your password' }[view]}
+      </span>
+      {presetEmail && view === 'signin' && <p className={css.note}>Enter the password for {presetEmail}. Both ways will open the same account.</p>}
       <label className={css.field}>
         <span className={css.fieldLabel}>email</span>
         <input className={css.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required autoFocus />
@@ -209,9 +212,12 @@ function EmailForm({ onBack }: { onBack: () => void }) {
 
 export function SignInButtons({ note = true, compact = false }: { note?: boolean; compact?: boolean }) {
   const error = useAuth((s) => s.error)
+  const linkHint = useAuth((s) => s.linkHint)
   const status = useAuth((s) => s.status)
   const [busy, setBusy] = useState(false)
   const [withEmail, setWithEmail] = useState(false)
+  const [closedLink, setClosedLink] = useState<string | null>(null)
+  const showEmail = withEmail || (linkHint?.via === 'password' && closedLink !== linkHint.email)
 
   if (status === 'unavailable') {
     return <p className={css.note}>Accounts are not configured for this build. You can still play as a guest; progress stays on this device.</p>
@@ -219,8 +225,15 @@ export function SignInButtons({ note = true, compact = false }: { note?: boolean
 
   return (
     <div className={css.providers}>
-      {withEmail ? (
-        <EmailForm onBack={() => setWithEmail(false)} />
+      {showEmail ? (
+        <EmailForm
+          key={linkHint?.email ?? 'email'}
+          onBack={() => {
+            setWithEmail(false)
+            if (linkHint) setClosedLink(linkHint.email)
+          }}
+          presetEmail={linkHint?.via === 'password' ? linkHint.email : undefined}
+        />
       ) : (
         <div className={compact ? css.providerGrid : css.providers}>
           {PROVIDERS.map((p) => {
@@ -261,7 +274,12 @@ export function SignInButtons({ note = true, compact = false }: { note?: boolean
           </Button>
         </div>
       )}
-      {note && !withEmail && <p className={css.note}>Your guest streak and best runs come with you.</p>}
+      {linkHint?.via === 'any' && (
+        <p className={css.note} role="alert">
+          {linkHint.email} already has an account. Sign in the way you usually do and we'll connect this one.
+        </p>
+      )}
+      {note && !showEmail && !linkHint && <p className={css.note}>Your guest streak and best runs come with you.</p>}
       {error && (
         <p className={css.error} role="alert">
           {error}

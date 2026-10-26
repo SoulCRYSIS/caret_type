@@ -1,4 +1,4 @@
-import trackUrl from '../../assets/music/caret_paper_lanterns_loop.ogg'
+import trackUrl from '../../assets/music/caret_ink_on_water_soft_loop.ogg'
 
 const FADE_IN = 1.1
 const FADE_OUT = 0.55

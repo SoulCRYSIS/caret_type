@@ -1,10 +1,13 @@
 import {
+  EmailAuthProvider,
   FacebookAuthProvider,
   GithubAuthProvider,
   GoogleAuthProvider,
   OAuthProvider,
   createUserWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
   getRedirectResult,
+  linkWithCredential,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
@@ -14,11 +17,13 @@ import {
   signInWithRedirect,
   signOut,
   updateProfile,
+  type AuthCredential,
   type AuthProvider,
   type User,
 } from 'firebase/auth'
 import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../../lib/firebase'
+import { firebaseConfig } from '../../lib/firebaseConfig'
 import type { RunResult } from '../../game/modes/types'
 import { fetchOwnEntry, submitRun, type BoardUser, type SubmitResult } from '../leaderboard/api'
 import { MODES } from '../../game/modes/registry'
@@ -71,28 +76,170 @@ export function watchAuth(cb: (user: User | null) => void): () => void {
   return onAuthStateChanged(auth, cb)
 }
 
-export async function signInWith(id: ProviderId): Promise<void> {
+/** A sign-in that matched an existing email, held until that account signs in so the two can be joined. */
+let pendingLink: { email: string; credential: AuthCredential } | null = null
+
+const METHOD_TO_PROVIDER: Record<string, ProviderId> = {
+  'google.com': 'google',
+  'github.com': 'github',
+  'microsoft.com': 'microsoft',
+  'facebook.com': 'facebook',
+}
+
+class LinkError extends Error {
+  code: 'caret/link-needs-password' | 'caret/link-needs-sign-in'
+  email: string
+  constructor(code: 'caret/link-needs-password' | 'caret/link-needs-sign-in', email: string) {
+    super(code)
+    this.code = code
+    this.email = email
+  }
+}
+
+function authCode(err: unknown): string | undefined {
+  return (err as { code?: string } | null)?.code
+}
+
+function isCancelled(err: unknown): boolean {
+  const code = authCode(err)
+  return code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
+}
+
+/** The credential Firebase refused to sign in with, because this email already belongs to an account. */
+function pendingCredential(err: unknown): AuthCredential | null {
+  return OAuthProvider.credentialFromError(err as never) ?? GoogleAuthProvider.credentialFromError(err as never) ?? GithubAuthProvider.credentialFromError(err as never) ?? FacebookAuthProvider.credentialFromError(err as never)
+}
+
+/** Join a held sign-in onto the account that just signed in, when it is the same email. */
+async function finishPendingLink(): Promise<void> {
+  const pending = pendingLink
+  const user = auth.currentUser
+  if (!pending || !user) return
+  pendingLink = null
+  if (user.email?.toLowerCase() !== pending.email.toLowerCase()) return
+  try {
+    await linkWithCredential(user, pending.credential)
+  } catch (err) {
+    const code = authCode(err)
+    // Already joined, or the credential belongs to this account already. The sign-in itself succeeded.
+    if (code === 'auth/provider-already-linked' || code === 'auth/credential-already-in-use') return
+    console.error(err)
+  }
+}
+
+/**
+ * The email is already an account. Sign in with the method it already has, then attach the new one,
+ * so both ways open the same account from then on.
+ */
+async function linkExistingAccount(err: unknown): Promise<void> {
+  const email = (err as { customData?: { email?: string } }).customData?.email
+  const credential = pendingCredential(err)
+  if (!email || !credential) throw err
+
+  const methods = await fetchSignInMethodsForEmail(auth, email).catch(() => [] as string[])
+  const oauth = methods.map((m) => METHOD_TO_PROVIDER[m]).find((id): id is ProviderId => !!id)
+  if (oauth) {
+    try {
+      await signInWithPopup(auth, createProvider(oauth))
+    } catch (next) {
+      if (isCancelled(next)) return
+      throw next
+    }
+    const user = auth.currentUser
+    if (!user || user.email?.toLowerCase() !== email.toLowerCase()) {
+      if (user) await signOut(auth)
+      throw new LinkError('caret/link-needs-sign-in', email)
+    }
+    await linkWithCredential(user, credential).catch((linkErr) => {
+      const code = authCode(linkErr)
+      if (code !== 'auth/provider-already-linked' && code !== 'auth/credential-already-in-use') throw linkErr
+    })
+    return
+  }
+
+  pendingLink = { email, credential }
+  throw new LinkError(methods.includes('password') ? 'caret/link-needs-password' : 'caret/link-needs-sign-in', email)
+}
+
+/** Attach a password to the signed-in account. Enumeration protection blocks the client call, so the token endpoint is the fallback. */
+async function linkPassword(user: User, email: string, password: string): Promise<void> {
+  let clientError: unknown
+  try {
+    await linkWithCredential(user, EmailAuthProvider.credential(email, password))
+    return
+  } catch (err) {
+    const code = authCode(err)
+    if (code === 'auth/provider-already-linked' || code === 'auth/email-already-in-use') return
+    clientError = err
+  }
+  const idToken = await user.getIdToken()
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken, email, password, returnSecureToken: true }),
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
+    const message = body?.error?.message ?? ''
+    if (message.includes('EMAIL_EXISTS') || message.includes('FEDERATED_USER_ID_ALREADY_LINKED')) return
+    throw clientError
+  }
+  await reload(user)
+}
+
+/** True once an account is signed in. False when the popup was closed, with no error. */
+export async function signInWith(id: ProviderId): Promise<boolean> {
   const provider = createProvider(id)
   try {
     await signInWithPopup(auth, provider)
+    await finishPendingLink()
+    return true
   } catch (err) {
-    const code = (err as { code?: string }).code
+    const code = authCode(err)
     if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-environment') {
       await signInWithRedirect(auth, provider)
-      return
+      return true
     }
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return
+    if (isCancelled(err)) return false
+    if (code === 'auth/account-exists-with-different-credential') {
+      await linkExistingAccount(err)
+      return auth.currentUser !== null
+    }
     throw err
   }
 }
 
 export async function emailSignIn(email: string, password: string): Promise<void> {
   await signInWithEmailAndPassword(auth, email, password)
+  await finishPendingLink()
 }
 
-export async function emailSignUp(email: string, password: string): Promise<void> {
-  const { user } = await createUserWithEmailAndPassword(auth, email, password)
-  await sendVerification(user).catch((err) => console.error(err))
+/** True once the account exists and is signed in. False when the connecting popup was closed. */
+export async function emailSignUp(email: string, password: string): Promise<boolean> {
+  try {
+    const { user } = await createUserWithEmailAndPassword(auth, email, password)
+    await sendVerification(user).catch((err) => console.error(err))
+    return true
+  } catch (err) {
+    if (authCode(err) !== 'auth/email-already-in-use') throw err
+    // The address already belongs to a social sign-in. Open that, then attach this password to it.
+    const methods = await fetchSignInMethodsForEmail(auth, email).catch(() => [] as string[])
+    const oauth = methods.map((m) => METHOD_TO_PROVIDER[m]).find((id): id is ProviderId => !!id)
+    if (!oauth || methods.includes('password')) throw err
+    try {
+      await signInWithPopup(auth, createProvider(oauth))
+    } catch (next) {
+      if (isCancelled(next)) return false
+      throw next
+    }
+    const user = auth.currentUser
+    if (!user || user.email?.toLowerCase() !== email.toLowerCase()) {
+      if (user) await signOut(auth)
+      throw err
+    }
+    await linkPassword(user, email, password)
+    return true
+  }
 }
 
 /** Password accounts must confirm their address; OAuth providers vouch for theirs. */
