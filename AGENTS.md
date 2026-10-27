@@ -67,6 +67,7 @@ A new mode: implement `GameMode` in `src/game/modes/types.ts`, register it, give
 10. **Rules lag code.** `validLang`, avatar regex `^[a-z0-9-]{1,32}$`, and `avatars/{uid}` must be deployed or new languages, uploads and settings sync fail silently. Hosting is still not yours to deploy.
 11. **Firebase stays out of first paint.** Auth/leaderboard/avatar fetches are dynamic imports. Do not statically import `features/leaderboard/api` from something on the idle screen.
 12. **Forcing `useAuth` state via CDP does not survive `sync()`.** To look at NamePrompt / ProfileForm, open the account menu.
+13. **Facebook will not preview a link until `robots.txt` is a real file.** The `**` → `index.html` rewrite was serving the app page at `/robots.txt` (`text/html`). Other scrapers ignore that; Facebook checks it first and then keeps the empty result. Preview tags live in `index.html` (crawlers do not run JS) and `public/og.jpg`. After a hosting deploy, the cached scrape only refreshes from the [Sharing Debugger](https://developers.facebook.com/tools/debug/?q=https%3A%2F%2Fcaret-type.web.app%2F) — a new query string on the shared URL does not, because `og:url` is the canonical.
 
 ## Tooling quirks
 
