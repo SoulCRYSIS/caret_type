@@ -4,11 +4,11 @@ Words drift down the page like falling ink. Type each one before it spills.
 
 Play it at [caret-type.web.app](https://caret-type.web.app/).
 
-![The idle screen: an ensō around the word begin, and the sentence play ink invaders in english at expert](docs/screens/start.png)
+<video src="docs/screens/trailer.mp4" controls playsinline>
+  <a href="docs/screens/trailer.mp4">A thirty-second run</a>
+</video>
 
 caret is a typing game with the look of paper and ink. There is no menu to click through. Open it, type any key, and a run starts. Words fall toward a margin at the bottom of the page. Type one out and it blots. Miss a letter and your combo takes a bite. Let a word reach the margin and you lose a drop of ink. Five spills and the page is full.
-
-![A run in progress: stamped words falling toward the margin, ink stains, five ink-drop lives](docs/screens/run.png)
 
 ## How a run feels
 
