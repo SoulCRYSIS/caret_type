@@ -264,6 +264,8 @@ export function GameHost() {
 
   return (
     <>
+      <div className={css.puddles} data-puddles />
+      <div className={css.port}>
       <div className={`${css.stage} ${css.dimmed}`} ref={stageRef} data-phase={phase}>
         <div className={css.shake} ref={shakeRef}>
           <canvas className={css.fx} ref={canvasRef} />
@@ -274,7 +276,8 @@ export function GameHost() {
       <div className={css.config} data-hidden={phase !== 'idle'}>
         <ConfigSentence />
       </div>
-
+      </div>
+      <div className={css.wash} data-wash />
       {phase === 'idle' && (
         <div className={css.overlay}>
           <IdleCard ready={!!words} error={wordsError} />

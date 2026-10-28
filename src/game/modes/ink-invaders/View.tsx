@@ -1,4 +1,5 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { brushStroke, hanko, SEAL_RED } from '../../cards/sumi'
 import { font, seeded } from '../../cards/print'
 import { FONT_DISPLAY } from '../../../theme/fonts'
@@ -10,6 +11,13 @@ import type { Banner, Enemy, InkState } from './state'
 import * as css from './view.css'
 
 type GlyphState = 'typed' | 'partial' | 'next' | 'todo'
+
+/** Full-window washes: low ink and a mistype. They sit above the play port. */
+function ScreenWash({ children }: { children: ReactNode }) {
+  const host = document.querySelector('[data-wash]')
+  if (!host) return null
+  return createPortal(children, host)
+}
 
 const EnemyView = memo(function EnemyView(props: { e: Enemy; typed: number; targeted: boolean; ctx: ModeContext; time: number }) {
   const { e, targeted } = props
@@ -289,8 +297,10 @@ export function InkInvadersView({ state: s, ctx }: ModeViewProps<InkState>) {
 
       {s.banner && <BannerView banner={s.banner} />}
       {s.comboCallout && <ComboCallout key={s.comboCallout.id} mult={s.comboCallout.mult} reduced={ctx.juice.reducedMotion} />}
-      {s.lives <= 2 && s.phase !== 'over' && <div className={css.vignette} data-critical={s.lives <= 1} />}
-      <div key={s.errorFlash} className={css.flash} data-on={s.errorFlash > 0} />
+      <ScreenWash>
+        {s.lives <= 2 && s.phase !== 'over' && <div className={css.vignette} data-critical={s.lives <= 1} />}
+        <div key={s.errorFlash} className={css.flash} data-on={s.errorFlash > 0} />
+      </ScreenWash>
     </div>
   )
 }

@@ -8,7 +8,7 @@ export const root = style({
   userSelect: 'none',
 })
 
-/* Pigment collects at the corners; words and HUD stay above the wash. */
+/* Pigment collects at the page corners, outside the play port. */
 export const bloom = style({
   position: 'absolute',
   inset: 0,

@@ -7,6 +7,35 @@ export const page = style({
   overflow: 'hidden',
 })
 
+/** Full page, behind the play area, so corner puddles sit on the paper around the port. */
+export const puddles = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: 0,
+  pointerEvents: 'none',
+})
+
+/** Full-page washes (low ink, a mistype) sit above the play area and cover the window. */
+export const wash = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: 2,
+  pointerEvents: 'none',
+})
+
+/** The play area stops at a desk-page size. A bigger window only adds paper around it. */
+export const port = style({
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  zIndex: 1,
+  width: 'min(1280px, 100%)',
+  height: 'min(880px, 100%)',
+  margin: 'auto',
+})
+
 export const stage = style({
   position: 'absolute',
   inset: 0,

@@ -9,9 +9,9 @@ export interface WaveConfig {
   /** Seconds between spawns (randomized ±25%). */
   spawnEvery: number
   maxActive: number
-  /** Seconds for a word to cross the page, before the per-letter allowance. */
+  /** Seconds of the shared fall, before this word's own length. */
   travel: number
-  /** Extra seconds of travel per letter, so long words stay fair. */
+  /** Seconds for a short word's keystrokes. A longer word stretches this on a log. */
   perChar: number
   /** Share of the page each correct key knocks the word being typed back up. */
   pushBack: number
@@ -34,9 +34,9 @@ export const MAX_LIVES = 5
  */
 export const TARGET_WPM: Record<Tier, number> = {
   easy: 25,
-  medium: 42,
-  hard: 65,
-  expert: 90,
+  medium: 50,
+  hard: 80,
+  expert: 120,
 }
 
 /** A player typing at the tier's target speed should run out of ink during this wave. */
@@ -53,6 +53,18 @@ const EXTRA_HEAVY: Record<Tier, number> = { easy: 0, medium: 0, hard: 0.6, exper
 
 /** Same on every wave so late waves don't lose their breathing room; only the tier sets it. */
 const PUSH_BACK: Record<Tier, number> = { easy: 0.0065, medium: 0.0045, hard: 0.0035, expert: 0.0028 }
+
+/**
+ * Pace is tuned on a short word, then stretched by the log of the real length.
+ * A word twice this long is only about a quarter slower, so long sets stay near
+ * the difficulty's speed instead of taking several times longer to cross.
+ */
+const PACE_CHARS = 4
+const LENGTH_LOG = 0.35
+
+function paceScale(chars: number): number {
+  return 1 + LENGTH_LOG * Math.log(Math.max(1, chars) / PACE_CHARS)
+}
 
 /**
  * Demand grows exponentially: ×2 every DOUBLING_WAVES. `crossover` is the wave
@@ -74,12 +86,11 @@ function buildConfig(wave: number, tier: Tier, lang: LanguageId, crossover: numb
   const demandWpm = TARGET_WPM[tier] * 2 ** ((n - crossover) / DOUBLING_WAVES)
   // a typed word is its letters plus the beat spent finding the next target
   const avgChars = (minLen + maxLenExact) / 2 + 1
-  const spawnEvery = (avgChars * 12) / demandWpm
-  // A word's fall = onScreen spawn intervals. One of those is the per-letter allowance
-  // (time to type it at the demanded speed); the rest is the base travel. Words drop
-  // faster exactly as fast as the pace rises, and the page holds a steady crowd.
+  // One short word of keystrokes. Length stretches the interval on a log, so a long
+  // set spawns a little slower and the page still holds the same crowd.
+  const perChar = (PACE_CHARS * 12) / demandWpm
+  const spawnEvery = perChar * paceScale(avgChars)
   const onScreen = ON_SCREEN[tier]
-  const perChar = 12 / demandWpm
   const travel = (onScreen - 1) * spawnEvery
 
   return {
@@ -146,8 +157,8 @@ export function expectedDeathWave(tier: Tier, lang: LanguageId, playerWpm: numbe
   return deathWave((n) => waveConfig(n, tier, lang), playerWpm)
 }
 
-/** Longer words get proportionally more time to be typed. */
+/** Longer words get a little more time, on a log, so a long set stays near the difficulty's pace. */
 export function travelTime(cfg: WaveConfig, units: number, heavy: boolean, rng: () => number = Math.random): number {
-  const t = cfg.travel * (1 + rng() * 0.25) + units * cfg.perChar
+  const t = cfg.travel * (1 + rng() * 0.25) + cfg.perChar * paceScale(units)
   return heavy ? t * 1.5 : t
 }
